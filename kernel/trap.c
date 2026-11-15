@@ -189,9 +189,9 @@ clockintr()
   }
 
   // ask for the next timer interrupt. this also clears
-  // the interrupt request. 1000000 is about a tenth
-  // of a second.
-  w_stimecmp(r_time() + 1000000);
+  // the interrupt request. TICK_INTERVAL (1000000) is
+  // about a tenth of a second.
+  w_stimecmp(r_time() + TICK_INTERVAL);
 }
 
 // check if it's an external interrupt or software interrupt,

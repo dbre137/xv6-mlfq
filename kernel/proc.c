@@ -28,8 +28,32 @@ mlfq_reset(struct proc *p)
 {
   p->mlfq_level = 0;
   p->mlfq_used = 0;
+  p->mlfq_start = 0;
   p->mlfq_slice = 0;
   memset(p->mlfq_ticks, 0, sizeof(p->mlfq_ticks));
+}
+
+// Add the CPU time p has used since mlfq_start to mlfq_used, then
+// demote p one level if, rounded to the nearest tick, it has used
+// its level's allotment. Measuring real time, rather than counting
+// the timer ticks a process happens to be running at, means a
+// process that sleeps just before every tick is still charged.
+// Returns 1 if p was demoted. Caller must hold p->lock.
+static int __attribute__((unused))
+mlfq_charge(struct proc *p)
+{
+  uint64 now = r_time();
+  p->mlfq_used += now - p->mlfq_start;
+  p->mlfq_start = now;
+
+  uint64 allot = mlfq_allotments[p->mlfq_level] * (uint64)TICK_INTERVAL;
+  if (p->mlfq_level < MLFQ_LEVELS - 1 && allot > 0 &&
+      p->mlfq_used + TICK_INTERVAL / 2 >= allot) {
+    p->mlfq_level++;
+    p->mlfq_used = 0;
+    return 1;
+  }
+  return 0;
 }
 
 struct proc *initproc;
@@ -613,11 +637,19 @@ mlfq_scheduler(void)
         if (p->state == RUNNABLE && p->mlfq_level == level) {
           next[level] = (idx + 1) % NPROC;
           p->mlfq_slice = 0;  // a fresh quantum each time it is dispatched
+          p->mlfq_start = r_time();
           p->state = RUNNING;
           c->proc = p;
           swtch(&c->context, &p->context);
           // Back here once p has yielded, slept or exited.
           c->proc = 0;
+          mlfq_charge(p);
+#if !MLFQ_ACCOUNT_ACROSS_YIELDS
+          // Naive rule: giving up the CPU before the allotment runs
+          // out starts the allotment again.
+          if (p->state == SLEEPING)
+            p->mlfq_used = 0;
+#endif
           found = 1;
           release(&p->lock);
           break;
@@ -743,9 +775,6 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
-  // MLFQ, naive accounting: giving up the CPU before the allotment
-  // runs out starts the allotment again.
-  p->mlfq_used = 0;
 
   sched();
 
@@ -935,8 +964,10 @@ mlfq_higher_runnable(int level)
 }
 #endif
 
-// Charge the current timer tick to the running process and decide
-// whether it should give up the CPU. Called on every timer interrupt
+// Record the current timer tick against the running process's level
+// (the mlfq_ticks[] statistics), charge it the CPU time it has used
+// (mlfq_charge()), and decide whether it should give up the CPU.
+// Called on every timer interrupt
 // that arrives while a process is running (from usertrap() and
 // kerneltrap()). Returns 1 if the caller should yield().
 //
@@ -955,13 +986,10 @@ mlfq_tick(void)
     return 0;
   acquire(&p->lock);
   p->mlfq_ticks[p->mlfq_level]++;
-  p->mlfq_used++;
   p->mlfq_slice++;
 #if SCHED_MLFQ
-  int allot = mlfq_allotments[p->mlfq_level];
-  if (p->mlfq_level < MLFQ_LEVELS - 1 && allot > 0 && p->mlfq_used >= allot) {
-    p->mlfq_level++;
-    p->mlfq_used = 0;
+  if (mlfq_charge(p)) {
+    // demoted: yield so the scheduler re-picks by level
   } else if (p->mlfq_slice < mlfq_quanta[p->mlfq_level]) {
     yield_now = 0;
   }
@@ -994,6 +1022,7 @@ mlfq_boost(void)
     if (p->state != UNUSED) {
       p->mlfq_level = 0;
       p->mlfq_used = 0;
+      p->mlfq_start = r_time();  // time before the boost is not charged
     }
     release(&p->lock);
   }
@@ -1018,7 +1047,7 @@ kgetpinfo(uint64 addr)
       e.state = p->state;
       safestrcpy(e.name, p->name, sizeof(e.name));
       e.level = p->mlfq_level;
-      e.ticks_used = p->mlfq_used;
+      e.ticks_used = (p->mlfq_used + TICK_INTERVAL / 2) / TICK_INTERVAL;
       memmove(e.ticks, p->mlfq_ticks, sizeof(e.ticks));
     }
     release(&p->lock);

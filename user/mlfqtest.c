@@ -156,10 +156,11 @@ await_level(char *test, int pid, int want_level, int want_state)
   return 0;
 }
 
-// A CPU-bound process is charged one tick at a time at its current
-// level and is demoted once it has used that level's allotment:
-// exactly 2 ticks at level 0, then 4 at level 1, then it stays at
-// the lowest level (allotments {2, 4, 0} in kernel/param.h).
+// A CPU-bound process is demoted once it has used its level's
+// allotment (allotments {2, 4, 0} in kernel/param.h), then stays at
+// the lowest level. CPU time is measured exactly but rounded to the
+// nearest tick, so the child records 2 timer ticks at level 0, or 3
+// if it was first dispatched late in a tick, and then 4 at level 1.
 static void
 test_demote(void)
 {
@@ -174,8 +175,8 @@ test_demote(void)
     uint total = total_ticks(e);
     printf("mlfqtest: %s: level %d, ticks %d/%d/%d\n", t, e->level,
            e->ticks[0], e->ticks[1], e->ticks[2]);
-    if (e->ticks[0] != 2 || e->ticks[1] != 4)
-      fail(t, "expected 2 ticks at level 0 and 4 at level 1");
+    if (e->ticks[0] < 2 || e->ticks[0] > 3 || e->ticks[1] != 4)
+      fail(t, "expected 2-3 ticks at level 0 and 4 at level 1");
     if (e->level != MLFQ_LEVELS - 1)
       fail(t, "not at the lowest level");
     // On one CPU with nothing else runnable, it gets nearly every tick.
@@ -386,8 +387,8 @@ test_boost(void)
 // the other blocks in read(), so level 0 is never empty; and as each
 // one sleeps after every message, it never uses up its allotment and
 // stays at level 0. With the boost, the CPU-bound process still gets
-// CPU time in every boost interval; with MLFQ_BOOST_INTERVAL 0 it
-// starves.
+// CPU time in every boost interval. With MLFQ_BOOST_INTERVAL 0 and
+// the naive accounting rule it starves.
 #define NPAIRS 2
 static void
 pingpong(int in, int out, int deadline)
@@ -448,9 +449,13 @@ starve_body(void)
 #if MLFQ_BOOST_INTERVAL > 0
   if (gained < 2)
     fail(t, "CPU-bound process starved despite the boost");
-#else
+#elif !MLFQ_ACCOUNT_ACROSS_YIELDS
   if (gained > 1)
     fail(t, "CPU-bound process ran although nothing boosts it");
+#else
+  // With accounting across yields the ping-pong processes are charged
+  // for all the CPU they use and are demoted too, so they cannot
+  // starve the CPU-bound process; nothing to check either way.
 #endif
   printf("mlfqtest: %s OK (CPU-bound process got %d of 105 ticks)\n",
          t, gained);

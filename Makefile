@@ -153,6 +153,7 @@ UPROGS=\
 	$U/_uoa_testschd\
 	$U/_mlfqtest\
 	$U/_mlfqps\
+	$U/_mlfqbench\
 
 fs.img: mkfs/mkfs README.xv6 $(UPROGS)
 	mkfs/mkfs fs.img README.xv6 $(UPROGS)

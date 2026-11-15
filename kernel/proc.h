@@ -97,6 +97,7 @@ struct proc {
   uint64 mlfq_used;              // CPU time used at the current level,
                                  // in r_time() units (TICK_INTERVAL per tick)
   uint64 mlfq_start;             // r_time() when mlfq_used was last updated
+  uint64 mlfq_cpu;               // total CPU time since creation, r_time() units
   uint mlfq_slice;               // timer ticks since last dispatched
   uint mlfq_ticks[MLFQ_LEVELS];  // ticks run at each level
 

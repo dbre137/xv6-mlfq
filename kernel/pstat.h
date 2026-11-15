@@ -12,6 +12,9 @@ struct pstat_entry {
   int level;                 // current MLFQ level, 0 = highest
   uint ticks_used;           // ticks used at the current level
   uint ticks[MLFQ_LEVELS];   // ticks run at each level since creation
+  uint cputime;              // measured CPU time since creation, in
+                             // hundredths of a tick (MLFQ only; 0 under
+                             // the round-robin baseline)
 };
 
 struct pstat {

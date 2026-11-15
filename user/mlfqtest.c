@@ -182,6 +182,10 @@ test_demote(void)
     // On one CPU with nothing else runnable, it gets nearly every tick.
     if (total < 8 || total > 11)
       fail(t, "expected 8-11 ticks in a 10-tick spin");
+    // Measured CPU time (hundredths of a tick) agrees with the
+    // sampled ticks to within about a tick.
+    if (e->cputime < (total - 1) * 100 || e->cputime > (total + 1) * 100)
+      fail(t, "measured CPU time does not match the ticks it ran");
     exit(0);
   }
   int status;
@@ -572,7 +576,7 @@ test_fork(void)
     fail(t, "child inherited the parent's level");
   // The child has barely run (it blocks at once in read), so it may
   // have caught at most one tick, never the parent's count.
-  if (e->ticks_used > 1 || total_ticks(e) > 1)
+  if (e->ticks_used > 1 || total_ticks(e) > 1 || e->cputime > 100)
     fail(t, "child inherited or gained ticks");
 
   write(fds[1], "x", 1);

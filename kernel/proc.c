@@ -29,6 +29,7 @@ mlfq_reset(struct proc *p)
   p->mlfq_level = 0;
   p->mlfq_used = 0;
   p->mlfq_start = 0;
+  p->mlfq_cpu = 0;
   p->mlfq_slice = 0;
   memset(p->mlfq_ticks, 0, sizeof(p->mlfq_ticks));
 }
@@ -44,6 +45,7 @@ mlfq_charge(struct proc *p)
 {
   uint64 now = r_time();
   p->mlfq_used += now - p->mlfq_start;
+  p->mlfq_cpu += now - p->mlfq_start;
   p->mlfq_start = now;
 
   uint64 allot = mlfq_allotments[p->mlfq_level] * (uint64)TICK_INTERVAL;
@@ -1020,9 +1022,13 @@ mlfq_boost(void)
   for (p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if (p->state != UNUSED) {
+      // A running process keeps the time it has used so far in its
+      // CPU total, but it does not count against its new level.
+      if (p->state == RUNNING)
+        p->mlfq_cpu += r_time() - p->mlfq_start;
       p->mlfq_level = 0;
       p->mlfq_used = 0;
-      p->mlfq_start = r_time();  // time before the boost is not charged
+      p->mlfq_start = r_time();
     }
     release(&p->lock);
   }
@@ -1048,6 +1054,7 @@ kgetpinfo(uint64 addr)
       safestrcpy(e.name, p->name, sizeof(e.name));
       e.level = p->mlfq_level;
       e.ticks_used = (p->mlfq_used + TICK_INTERVAL / 2) / TICK_INTERVAL;
+      e.cputime = p->mlfq_cpu / (TICK_INTERVAL / 100);
       memmove(e.ticks, p->mlfq_ticks, sizeof(e.ticks));
     }
     release(&p->lock);

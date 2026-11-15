@@ -574,6 +574,52 @@ default_scheduler(void)
 
 /* END OF SCHEDULER ALGORITHMS */
 
+// MLFQ scheduler. Always runs a RUNNABLE process from the highest
+// (lowest-numbered) level that has one, and round-robins between the
+// processes at that level. After every dispatch the search starts
+// again from level 0, so a process that has become runnable at a
+// higher level is chosen next.
+__attribute__((noreturn)) void
+mlfq_scheduler(void)
+{
+  // Per-level round-robin cursor: the proc[] index at which the next
+  // search of that level starts, one past the process it last ran.
+  // Shared by all CPUs; the project runs with CPUS=1.
+  static int next[MLFQ_LEVELS];
+  struct cpu *c = mycpu();
+
+  c->proc = 0;
+  for (;;) {
+    // As in default_scheduler(): let pending interrupts in, then
+    // keep them off while choosing, to avoid a race with wfi.
+    intr_on();
+    intr_off();
+
+    int found = 0;
+    for (int level = 0; level < MLFQ_LEVELS && !found; level++) {
+      for (int i = 0; i < NPROC; i++) {
+        int idx = (next[level] + i) % NPROC;
+        struct proc *p = &proc[idx];
+        acquire(&p->lock);
+        if (p->state == RUNNABLE && p->mlfq_level == level) {
+          next[level] = (idx + 1) % NPROC;
+          p->state = RUNNING;
+          c->proc = p;
+          swtch(&c->context, &p->context);
+          // Back here once p has yielded, slept or exited.
+          c->proc = 0;
+          found = 1;
+          release(&p->lock);
+          break;
+        }
+        release(&p->lock);
+      }
+    }
+    if (!found)
+      asm volatile("wfi");
+  }
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -585,7 +631,11 @@ default_scheduler(void)
 void
 scheduler(void)
 {
+#if SCHED_MLFQ
+  mlfq_scheduler();
+#else
   default_scheduler();
+#endif
 }
 
 // Switch to scheduler.  Must hold only p->lock

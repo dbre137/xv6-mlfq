@@ -141,6 +141,39 @@ test_sleepticks(void)
   printf("mlfqtest: %s OK\n", t);
 }
 
+// Two CPU-bound processes at the same level share the CPU
+// (round-robin within a level): over a 6-tick window each gets at
+// least 2 ticks, rather than one running while the other starves.
+static void
+test_rr(void)
+{
+  char *t = "rr";
+  int pids[2];
+
+  for (int k = 0; k < 2; k++) {
+    pids[k] = fork();
+    if (pids[k] < 0)
+      fail(t, "fork failed");
+    if (pids[k] == 0) {
+      spin(12);
+      exit(0);
+    }
+  }
+  pause(6);
+  for (int k = 0; k < 2; k++) {
+    struct pstat_entry *e = lookup(t, pids[k]);
+    if (e == 0)
+      fail(t, "child exited too early");
+    if (total_ticks(e) < 2)
+      fail(t, "a child got fewer than 2 of 6 ticks");
+  }
+  for (int k = 0; k < 2; k++) {
+    kill(pids[k]);
+    wait(0);
+  }
+  printf("mlfqtest: %s OK\n", t);
+}
+
 // A forked child starts at the top level without inheriting the
 // parent's ticks, and its slot is cleared once it has been reaped.
 static void
@@ -203,6 +236,7 @@ main(int argc, char *argv[])
   test_unused();
   test_cputicks();
   test_sleepticks();
+  test_rr();
   test_fork();
   test_badptr();
   printf("mlfqtest: OK\n");

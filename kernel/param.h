@@ -14,5 +14,6 @@
 #define USERSTACK    1     // user stack pages
 
 // MLFQ scheduler
+#define SCHED_MLFQ   1     // 1 = MLFQ scheduler, 0 = xv6 round-robin baseline
 #define MLFQ_LEVELS  3     // number of priority levels (0 = highest)
 

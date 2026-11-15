@@ -82,6 +82,7 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2) {
+    mlfq_tick();
     update_process_times();
     yield();
   }
@@ -155,6 +156,7 @@ kerneltrap()
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2 && myproc() != 0) {
+    mlfq_tick();
     update_process_times();
     yield();
   }

@@ -852,6 +852,23 @@ kgetwaitstats(int pid, uint *r_ticks, uint *s_ticks)
   return -1;
 }
 
+// Charge the current timer tick to the running process: count it
+// at the process's current level and as time used at that level.
+// Called on every timer interrupt that arrives while a process is
+// running (from usertrap() and kerneltrap()), before it yields.
+void
+mlfq_tick(void)
+{
+  struct proc *p = myproc();
+
+  if (p == 0)
+    return;
+  acquire(&p->lock);
+  p->mlfq_ticks[p->mlfq_level]++;
+  p->mlfq_used++;
+  release(&p->lock);
+}
+
 // Copy an MLFQ snapshot of every process-table slot to the
 // struct pstat at user address addr. Each slot is read under its
 // own p->lock, so each entry is consistent, but the table as a

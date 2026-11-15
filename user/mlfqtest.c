@@ -70,14 +70,89 @@ test_unused(void)
   printf("mlfqtest: %s OK\n", t);
 }
 
-// A forked child starts at the top level with no ticks, and its
-// slot is cleared once it has exited and been reaped.
+// Spin in user mode for about n timer ticks of wall-clock time.
+// Check the clock only occasionally: uptime() runs with interrupts
+// off while it holds tickslock, so calling it in a tight loop would
+// make nearly every timer interrupt arrive in the kernel instead.
+static void
+spin(int n)
+{
+  int start = uptime();
+  while (uptime() - start < n)
+    for (volatile int i = 0; i < 1000000; i++)
+      ;
+}
+
+static uint
+total_ticks(struct pstat_entry *e)
+{
+  uint sum = 0;
+  for (int l = 0; l < MLFQ_LEVELS; l++)
+    sum += e->ticks[l];
+  return sum;
+}
+
+// CPU time is charged to the running process's current level.
+// Nothing demotes yet, so it all lands on level 0.
+static void
+test_cputicks(void)
+{
+  char *t = "cputicks";
+  struct pstat_entry *e = lookup(t, getpid());
+  if (e == 0)
+    fail(t, "own pid not in table");
+  uint before = e->ticks[0];
+
+  spin(10);
+
+  e = lookup(t, getpid());
+  uint gained = e->ticks[0] - before;
+  // On one CPU with nothing else runnable, we should get almost
+  // every one of the 10 ticks.
+  if (gained < 8)
+    fail(t, "fewer than 8 of 10 ticks counted at level 0");
+  if (gained > 11)
+    fail(t, "more ticks counted than elapsed");
+  for (int l = 1; l < MLFQ_LEVELS; l++)
+    if (e->ticks[l] != 0)
+      fail(t, "ticks counted below level 0");
+  if (e->ticks_used != e->ticks[0])
+    fail(t, "ticks_used differs from level-0 ticks");
+  printf("mlfqtest: %s OK (%d ticks at level 0)\n", t, gained);
+}
+
+// A process that sleeps is not charged for the time it sleeps.
+static void
+test_sleepticks(void)
+{
+  char *t = "sleepticks";
+  int pid = fork();
+  if (pid < 0)
+    fail(t, "fork failed");
+  if (pid == 0) {
+    pause(10);
+    struct pstat_entry *e = lookup(t, getpid());
+    exit(e != 0 && total_ticks(e) <= 1 ? 0 : 1);
+  }
+  int status;
+  wait(&status);
+  if (status != 0)
+    fail(t, "sleeping child was charged CPU ticks");
+  printf("mlfqtest: %s OK\n", t);
+}
+
+// A forked child starts at the top level without inheriting the
+// parent's ticks, and its slot is cleared once it has been reaped.
 static void
 test_fork(void)
 {
   char *t = "fork";
   int fds[2];
   char c;
+
+  struct pstat_entry *me = lookup(t, getpid());
+  if (me == 0 || me->ticks[0] < 2)
+    fail(t, "parent should have run for some ticks first");
 
   if (pipe(fds) < 0)
     fail(t, "pipe failed");
@@ -97,11 +172,10 @@ test_fork(void)
     fail(t, "child not in table");
   if (e->level != 0)
     fail(t, "child not at level 0");
-  if (e->ticks_used != 0)
-    fail(t, "child has ticks used");
-  for (int l = 0; l < MLFQ_LEVELS; l++)
-    if (e->ticks[l] != 0)
-      fail(t, "child has recorded ticks");
+  // The child has barely run (it blocks at once in read), so it may
+  // have caught at most one tick, never the parent's count.
+  if (e->ticks_used > 1 || total_ticks(e) > 1)
+    fail(t, "child inherited or gained ticks");
 
   write(fds[1], "x", 1);
   close(fds[1]);
@@ -127,6 +201,8 @@ main(int argc, char *argv[])
 {
   test_self();
   test_unused();
+  test_cputicks();
+  test_sleepticks();
   test_fork();
   test_badptr();
   printf("mlfqtest: OK\n");

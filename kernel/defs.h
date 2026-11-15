@@ -108,6 +108,7 @@ void            update_process_times(void);
 int             kgetwaitstats(int, uint*, uint*);
 int             kwaitx(uint64, uint64, uint64);
 int             kgetpinfo(uint64);
+void            mlfq_tick(void);
 
 // swtch.S
 void            swtch(struct context*, struct context*);

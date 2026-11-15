@@ -63,6 +63,8 @@ OBJDUMP = $(TOOLPREFIX)objdump
 
 CFLAGS = -Wall -Werror -Wno-unknown-attributes -O -fno-omit-frame-pointer -ggdb -gdwarf-2
 CFLAGS += -march=rv64gc
+# MLFQ parameter overrides, e.g. MLFQ_DEFS='-DMLFQ_BOOST_INTERVAL=10' (see kernel/param.h)
+CFLAGS += $(MLFQ_DEFS)
 CFLAGS += -MD
 CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding

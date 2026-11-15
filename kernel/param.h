@@ -13,14 +13,27 @@
 #define MAXPATH      128   // maximum file path name
 #define USERSTACK    1     // user stack pages
 
-// MLFQ scheduler
-#define SCHED_MLFQ 1     // 1 = MLFQ scheduler, 0 = xv6 round-robin baseline
-#define MLFQ_LEVELS  3     // number of priority levels (0 = highest)
-#define MLFQ_QUANTA      {1, 2, 4}  // per level: ticks a process runs before it yields
-#define MLFQ_ALLOTMENTS  {2, 4, 0}  // per level: ticks used before demotion (0 = never)
-#define MLFQ_BOOST_INTERVAL 50     // ticks between priority boosts (0 = never boost)
-#define MLFQ_ACCOUNT_ACROSS_YIELDS 1 // 1 = CPU time used at a level carries over
-                                     //     when a process sleeps; 0 = naive rule:
-                                     //     sleeping restarts the allotment
+// MLFQ scheduler. Each setting except MLFQ_LEVELS can be overridden
+// at build time without editing this file, e.g.
+//   make clean && make qemu MLFQ_DEFS='-DMLFQ_BOOST_INTERVAL=10'
+// (run make clean first: make does not notice a changed MLFQ_DEFS).
+#ifndef SCHED_MLFQ
+#define SCHED_MLFQ          1          // 1 = MLFQ scheduler, 0 = xv6 round-robin baseline
+#endif
+#define MLFQ_LEVELS         3          // number of priority levels (0 = highest)
+#ifndef MLFQ_QUANTA
+#define MLFQ_QUANTA         {1, 2, 4}  // per level: ticks a process runs before it yields
+#endif
+#ifndef MLFQ_ALLOTMENTS
+#define MLFQ_ALLOTMENTS     {2, 4, 0}  // per level: ticks used before demotion (0 = never)
+#endif
+#ifndef MLFQ_BOOST_INTERVAL
+#define MLFQ_BOOST_INTERVAL 50         // ticks between priority boosts (0 = never boost)
+#endif
+#ifndef MLFQ_ACCOUNT_ACROSS_YIELDS
+#define MLFQ_ACCOUNT_ACROSS_YIELDS 1   // 1 = CPU time used at a level carries over
+                                       //     when a process sleeps; 0 = naive rule:
+                                       //     sleeping restarts the allotment
+#endif
 #define TICK_INTERVAL 1000000      // timer (r_time) units per tick, about 0.1 s
 

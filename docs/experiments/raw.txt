@@ -1,0 +1,176 @@
+# 2026-11-16 10:18 ec4d6b6 e1 e2 e3 e4
+e1-rr run=1 CONFIG sched=rr quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-rr run=1 RESULT workload=cpu kind=cpu n=4 turnaround=19.7 waiting=14.0 response=1.5 maxresponse=3
+e1-rr run=1 CONFIG sched=rr quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-rr run=1 RESULT workload=io kind=io n=4 turnaround=10.0 waiting=0.0 response=0.0 maxresponse=0
+e1-rr run=1 CONFIG sched=rr quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-rr run=1 RESULT workload=mixed kind=cpu n=4 turnaround=20.0 waiting=13.2 response=3.2 maxresponse=7
+e1-rr run=1 RESULT workload=mixed kind=io n=4 turnaround=23.5 waiting=20.0 response=3.2 maxresponse=4
+e1-rr run=2 CONFIG sched=rr quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-rr run=2 RESULT workload=cpu kind=cpu n=4 turnaround=19.7 waiting=14.0 response=1.5 maxresponse=3
+e1-rr run=2 CONFIG sched=rr quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-rr run=2 RESULT workload=io kind=io n=4 turnaround=10.5 waiting=0.7 response=0.2 maxresponse=1
+e1-rr run=2 CONFIG sched=rr quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-rr run=2 RESULT workload=mixed kind=cpu n=4 turnaround=18.7 waiting=13.5 response=1.5 maxresponse=3
+e1-rr run=2 RESULT workload=mixed kind=io n=4 turnaround=24.0 waiting=20.0 response=2.5 maxresponse=4
+e1-rr run=3 CONFIG sched=rr quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-rr run=3 RESULT workload=cpu kind=cpu n=4 turnaround=18.7 waiting=13.5 response=1.5 maxresponse=3
+e1-rr run=3 CONFIG sched=rr quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-rr run=3 RESULT workload=io kind=io n=4 turnaround=10.0 waiting=0.0 response=0.0 maxresponse=0
+e1-rr run=3 CONFIG sched=rr quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-rr run=3 RESULT workload=mixed kind=cpu n=4 turnaround=19.5 waiting=13.7 response=1.5 maxresponse=3
+e1-rr run=3 RESULT workload=mixed kind=io n=4 turnaround=24.5 waiting=20.0 response=2.5 maxresponse=4
+e1-mlfq run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-mlfq run=1 RESULT workload=cpu kind=cpu n=4 turnaround=18.5 waiting=13.5 response=1.5 maxresponse=3
+e1-mlfq run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-mlfq run=1 RESULT workload=io kind=io n=4 turnaround=10.0 waiting=0.0 response=0.0 maxresponse=0
+e1-mlfq run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-mlfq run=1 RESULT workload=mixed kind=cpu n=4 turnaround=19.5 waiting=13.5 response=1.5 maxresponse=3
+e1-mlfq run=1 RESULT workload=mixed kind=io n=4 turnaround=19.0 waiting=18.0 response=2.5 maxresponse=4
+e1-mlfq run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-mlfq run=2 RESULT workload=cpu kind=cpu n=4 turnaround=18.0 waiting=13.2 response=1.5 maxresponse=3
+e1-mlfq run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-mlfq run=2 RESULT workload=io kind=io n=4 turnaround=10.0 waiting=0.0 response=0.0 maxresponse=0
+e1-mlfq run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-mlfq run=2 RESULT workload=mixed kind=cpu n=4 turnaround=18.2 waiting=13.0 response=1.5 maxresponse=3
+e1-mlfq run=2 RESULT workload=mixed kind=io n=4 turnaround=18.0 waiting=17.5 response=2.5 maxresponse=4
+e1-mlfq run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-mlfq run=3 RESULT workload=cpu kind=cpu n=4 turnaround=18.5 waiting=13.5 response=1.5 maxresponse=3
+e1-mlfq run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-mlfq run=3 RESULT workload=io kind=io n=4 turnaround=10.0 waiting=0.0 response=0.0 maxresponse=0
+e1-mlfq run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e1-mlfq run=3 RESULT workload=mixed kind=cpu n=4 turnaround=18.2 waiting=13.0 response=1.5 maxresponse=3
+e1-mlfq run=3 RESULT workload=mixed kind=io n=4 turnaround=18.0 waiting=17.5 response=2.5 maxresponse=4
+e2-q1,2,4 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e2-q1,2,4 run=1 RESULT workload=mixed kind=cpu n=4 turnaround=18.5 waiting=13.5 response=1.5 maxresponse=3
+e2-q1,2,4 run=1 RESULT workload=mixed kind=io n=4 turnaround=16.2 waiting=16.2 response=2.5 maxresponse=4
+e2-q1,2,4 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e2-q1,2,4 run=2 RESULT workload=mixed kind=cpu n=4 turnaround=19.2 waiting=14.2 response=1.5 maxresponse=3
+e2-q1,2,4 run=2 RESULT workload=mixed kind=io n=4 turnaround=16.2 waiting=16.2 response=2.5 maxresponse=4
+e2-q1,2,4 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e2-q1,2,4 run=3 RESULT workload=mixed kind=cpu n=4 turnaround=19.2 waiting=14.2 response=1.5 maxresponse=3
+e2-q1,2,4 run=3 RESULT workload=mixed kind=io n=4 turnaround=16.2 waiting=16.2 response=2.5 maxresponse=4
+e2-q2,4,8 run=1 CONFIG sched=mlfq quanta=2,4,8 allotments=4,8,0 boost=50 across=1
+e2-q2,4,8 run=1 RESULT workload=mixed kind=cpu n=4 turnaround=18.2 waiting=13.5 response=3.0 maxresponse=6
+e2-q2,4,8 run=1 RESULT workload=mixed kind=io n=4 turnaround=24.2 waiting=19.0 response=5.0 maxresponse=8
+e2-q2,4,8 run=2 CONFIG sched=mlfq quanta=2,4,8 allotments=4,8,0 boost=50 across=1
+e2-q2,4,8 run=2 RESULT workload=mixed kind=cpu n=4 turnaround=20.0 waiting=15.0 response=3.0 maxresponse=6
+e2-q2,4,8 run=2 RESULT workload=mixed kind=io n=4 turnaround=24.2 waiting=20.0 response=5.0 maxresponse=8
+e2-q2,4,8 run=3 CONFIG sched=mlfq quanta=2,4,8 allotments=4,8,0 boost=50 across=1
+e2-q2,4,8 run=3 RESULT workload=mixed kind=cpu n=4 turnaround=20.0 waiting=15.0 response=3.0 maxresponse=6
+e2-q2,4,8 run=3 RESULT workload=mixed kind=io n=4 turnaround=24.2 waiting=20.0 response=5.0 maxresponse=8
+e2-q4,8,16 run=1 CONFIG sched=mlfq quanta=4,8,16 allotments=8,16,0 boost=50 across=1
+e2-q4,8,16 run=1 RESULT workload=mixed kind=cpu n=4 turnaround=20.0 waiting=13.5 response=6.0 maxresponse=12
+e2-q4,8,16 run=1 RESULT workload=mixed kind=io n=4 turnaround=28.2 waiting=20.0 response=10.0 maxresponse=16
+e2-q4,8,16 run=2 CONFIG sched=mlfq quanta=4,8,16 allotments=8,16,0 boost=50 across=1
+e2-q4,8,16 run=2 RESULT workload=mixed kind=cpu n=4 turnaround=19.0 waiting=13.5 response=6.0 maxresponse=12
+e2-q4,8,16 run=2 RESULT workload=mixed kind=io n=4 turnaround=27.5 waiting=19.0 response=10.0 maxresponse=16
+e2-q4,8,16 run=3 CONFIG sched=mlfq quanta=4,8,16 allotments=8,16,0 boost=50 across=1
+e2-q4,8,16 run=3 RESULT workload=mixed kind=cpu n=4 turnaround=20.0 waiting=13.5 response=6.0 maxresponse=12
+e2-q4,8,16 run=3 RESULT workload=mixed kind=io n=4 turnaround=28.2 waiting=20.0 response=10.0 maxresponse=16
+e3-across0-boost10 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=0
+e3-across0-boost10 run=1 RESULT starve window=300 cputicks=60 maxgap=8
+e3-across0-boost10 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=0
+e3-across0-boost10 run=2 RESULT starve window=300 cputicks=60 maxgap=8
+e3-across0-boost10 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=0
+e3-across0-boost10 run=3 RESULT starve window=300 cputicks=60 maxgap=8
+e3-across0-boost50 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=0
+e3-across0-boost50 run=1 RESULT starve window=300 cputicks=12 maxgap=48
+e3-across0-boost50 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=0
+e3-across0-boost50 run=2 RESULT starve window=300 cputicks=12 maxgap=48
+e3-across0-boost50 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=0
+e3-across0-boost50 run=3 RESULT starve window=300 cputicks=12 maxgap=48
+e3-across0-boost200 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=0
+e3-across0-boost200 run=1 RESULT starve window=300 cputicks=2 maxgap=188
+e3-across0-boost200 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=0
+e3-across0-boost200 run=2 RESULT starve window=300 cputicks=2 maxgap=189
+e3-across0-boost200 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=0
+e3-across0-boost200 run=3 RESULT starve window=300 cputicks=2 maxgap=188
+e3-across0-boost0 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=0
+e3-across0-boost0 run=1 RESULT starve window=300 cputicks=0 maxgap=300
+e3-across0-boost0 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=0
+e3-across0-boost0 run=2 RESULT starve window=300 cputicks=0 maxgap=300
+e3-across0-boost0 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=0
+e3-across0-boost0 run=3 RESULT starve window=300 cputicks=0 maxgap=300
+e3-across1-boost10 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=1
+e3-across1-boost10 run=1 RESULT starve window=300 cputicks=120 maxgap=6
+e3-across1-boost10 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=1
+e3-across1-boost10 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=1
+e3-across1-boost10 run=3 RESULT starve window=300 cputicks=150 maxgap=5
+e3-across1-boost50 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e3-across1-boost50 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e3-across1-boost50 run=2 RESULT starve window=300 cputicks=176 maxgap=16
+e3-across1-boost50 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e3-across1-boost200 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=1
+e3-across1-boost200 run=1 RESULT starve window=300 cputicks=265 maxgap=16
+e3-across1-boost200 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=1
+e3-across1-boost200 run=2 RESULT starve window=300 cputicks=265 maxgap=16
+e3-across1-boost200 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=1
+e3-across1-boost200 run=3 RESULT starve window=300 cputicks=266 maxgap=15
+e3-across1-boost0 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=1
+e3-across1-boost0 run=1 RESULT starve window=300 cputicks=285 maxgap=15
+e3-across1-boost0 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=1
+e3-across1-boost0 run=2 RESULT starve window=300 cputicks=285 maxgap=15
+e3-across1-boost0 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=1
+e3-across1-boost0 run=3 RESULT starve window=300 cputicks=285 maxgap=15
+e4-across0 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=0
+e4-across0 run=1 RESULT game window=200 elapsed=200 cpubound=152.7 gamer=55.6
+e4-across0 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=0
+e4-across0 run=2 RESULT game window=200 elapsed=200 cpubound=139.7 gamer=69.3
+e4-across0 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=0
+e4-across0 run=3 RESULT game window=200 elapsed=200 cpubound=144.0 gamer=65.5
+e4-across1 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e4-across1 run=1 RESULT game window=200 elapsed=200 cpubound=175.9 gamer=33.5
+e4-across1 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e4-across1 run=2 RESULT game window=200 elapsed=200 cpubound=173.6 gamer=34.8
+e4-across1 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e4-across1 run=3 RESULT game window=200 elapsed=200 cpubound=174.2 gamer=34.3
+# 2026-11-16 11:09 b79e663 e3
+e3-across0-boost10 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=0
+e3-across0-boost10 run=1 RESULT starve window=300 cputicks=60 maxgap=8
+e3-across0-boost10 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=0
+e3-across0-boost10 run=2 RESULT starve window=300 cputicks=60 maxgap=8
+e3-across0-boost10 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=0
+e3-across0-boost10 run=3 RESULT starve window=300 cputicks=60 maxgap=8
+e3-across0-boost50 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=0
+e3-across0-boost50 run=1 RESULT starve window=300 cputicks=12 maxgap=48
+e3-across0-boost50 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=0
+e3-across0-boost50 run=2 RESULT starve window=300 cputicks=12 maxgap=48
+e3-across0-boost50 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=0
+e3-across0-boost50 run=3 RESULT starve window=300 cputicks=12 maxgap=48
+e3-across0-boost200 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=0
+e3-across0-boost200 run=1 RESULT starve window=300 cputicks=2 maxgap=188
+e3-across0-boost200 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=0
+e3-across0-boost200 run=2 RESULT starve window=300 cputicks=2 maxgap=189
+e3-across0-boost200 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=0
+e3-across0-boost200 run=3 RESULT starve window=300 cputicks=2 maxgap=189
+e3-across0-boost0 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=0
+e3-across0-boost0 run=1 RESULT starve window=300 cputicks=0 maxgap=300
+e3-across0-boost0 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=0
+e3-across0-boost0 run=2 RESULT starve window=300 cputicks=0 maxgap=300
+e3-across0-boost0 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=0
+e3-across0-boost0 run=3 RESULT starve window=300 cputicks=0 maxgap=300
+e3-across1-boost10 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=1
+e3-across1-boost10 run=1 RESULT starve window=300 cputicks=121 maxgap=6
+e3-across1-boost10 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=1
+e3-across1-boost10 run=2 RESULT starve window=300 cputicks=121 maxgap=6
+e3-across1-boost10 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=10 across=1
+e3-across1-boost10 run=3 RESULT starve window=300 cputicks=121 maxgap=6
+e3-across1-boost50 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e3-across1-boost50 run=1 RESULT starve window=300 cputicks=168 maxgap=16
+e3-across1-boost50 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e3-across1-boost50 run=2 RESULT starve window=300 cputicks=171 maxgap=16
+e3-across1-boost50 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
+e3-across1-boost50 run=3 RESULT starve window=300 cputicks=169 maxgap=16
+e3-across1-boost200 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=1
+e3-across1-boost200 run=1 RESULT starve window=300 cputicks=263 maxgap=16
+e3-across1-boost200 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=1
+e3-across1-boost200 run=2 RESULT starve window=300 cputicks=263 maxgap=16
+e3-across1-boost200 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=200 across=1
+e3-across1-boost200 run=3 RESULT starve window=300 cputicks=263 maxgap=16
+e3-across1-boost0 run=1 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=1
+e3-across1-boost0 run=1 RESULT starve window=300 cputicks=284 maxgap=16
+e3-across1-boost0 run=2 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=1
+e3-across1-boost0 run=2 RESULT starve window=300 cputicks=284 maxgap=16
+e3-across1-boost0 run=3 CONFIG sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=0 across=1
+e3-across1-boost0 run=3 RESULT starve window=300 cputicks=284 maxgap=16

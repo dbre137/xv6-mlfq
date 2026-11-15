@@ -539,6 +539,162 @@ test_gaming(void)
   run_in_child("gaming", gaming_body);
 }
 
+// Edge cases: a process that exits, and one that is killed, part-way
+// through a quantum at the lowest level (4-tick quantum). In both cases
+// the process table slot must be freed, the other CPU-bound process
+// must keep getting the CPU, and a new process must start clean at
+// level 0 even if it reuses a freed slot.
+static void
+killexit_body(void)
+{
+  char *t = "killexit";
+  int low = MLFQ_LEVELS - 1;
+
+  avoid_boost(40);
+  int deadline = uptime() + 100;  // helpers exit by then regardless
+  int runner = fork();
+  if (runner < 0)
+    fail(t, "fork failed");
+  if (runner == 0) {
+    while (uptime() < deadline)
+      burn(1);
+    exit(0);
+  }
+  int quitter = fork();
+  if (quitter < 0)
+    fail(t, "fork failed");
+  if (quitter == 0) {
+    burn(7);  // reach the lowest level...
+    burn(1);  // ...then exit about one tick into a quantum
+    exit(0);
+  }
+
+  // Exit mid-quantum: reaped, slot freed, the runner carries on.
+  if (wait(0) != quitter)
+    fail(t, "wait did not return the exiting process");
+  if (lookup(t, quitter) != 0)
+    fail(t, "exited process still in the table");
+  struct pstat_entry *r = await_level(t, runner, low, -1);
+  uint before = total_ticks(r);
+  pause(5);
+  r = lookup(t, runner);
+  if (r == 0 || total_ticks(r) <= before)
+    fail(t, "runner stopped getting the CPU after a sibling exited");
+
+  // Kill mid-quantum. We run at level 0, so we get the CPU while the
+  // runner is in the middle of its 4-tick quantum at the lowest level.
+  int t0 = uptime();
+  kill(runner);
+  if (wait(0) != runner)
+    fail(t, "wait did not return the killed process");
+  if (uptime() - t0 > 3)
+    fail(t, "killed process took more than 3 ticks to exit");
+  if (lookup(t, runner) != 0)
+    fail(t, "killed process still in the table");
+
+  // A new process starts clean, whichever slot it gets.
+  int fds[2];
+  char c;
+  if (pipe(fds) < 0)
+    fail(t, "pipe failed");
+  int fresh = fork();
+  if (fresh < 0)
+    fail(t, "fork failed");
+  if (fresh == 0) {
+    close(fds[1]);
+    read(fds[0], &c, 1);
+    exit(0);
+  }
+  close(fds[0]);
+  struct pstat_entry *e = lookup(t, fresh);
+  if (e == 0 || e->level != 0 || total_ticks(e) > 1 || e->cputime > 100)
+    fail(t, "new process did not start clean at level 0");
+  write(fds[1], "x", 1);
+  close(fds[1]);
+  wait(0);
+  printf("mlfqtest: %s OK\n", t);
+}
+
+static void
+test_killexit(void)
+{
+  run_in_child("killexit", killexit_body);
+}
+
+// Lecture 8 scenario: one long-running CPU-bound job and one
+// interactive job that does a little work and then waits for "I/O"
+// (a one-tick sleep), 20 times. The interactive job should stay at
+// the top level and get the CPU as soon as it wakes, so its 20 rounds
+// take about 20 ticks; the CPU-bound job should sink to the lowest
+// level but still get most of the CPU.
+#define LECTURE_ROUNDS 20
+static void
+lecture_body(void)
+{
+  char *t = "lecture";
+  int low = MLFQ_LEVELS - 1;
+
+  avoid_boost(LECTURE_ROUNDS + 20);
+  int deadline = uptime() + 100;  // helper exits by then regardless
+  int cpu = fork();
+  if (cpu < 0)
+    fail(t, "fork failed");
+  if (cpu == 0) {
+    while (uptime() < deadline)
+      burn(1);
+    exit(0);
+  }
+  await_level(t, cpu, low, -1);
+  uint cpu_before = total_ticks(lookup(t, cpu));
+
+  int fds[2];
+  if (pipe(fds) < 0)
+    fail(t, "pipe failed");
+  int inter = fork();
+  if (inter < 0)
+    fail(t, "fork failed");
+  if (inter == 0) {
+    int t0 = uptime();
+    for (int r = 0; r < LECTURE_ROUNDS; r++) {
+      for (volatile int i = 0; i < 20000; i++)  // a little work
+        ;
+      pause(1);                                 // wait for "I/O"
+    }
+    int msg[2] = {uptime() - t0, lookup(t, getpid())->level};
+    write(fds[1], msg, sizeof(msg));
+    exit(0);
+  }
+  close(fds[1]);
+  int msg[2];
+  if (read(fds[0], msg, sizeof(msg)) != sizeof(msg))
+    fail(t, "no report from the interactive job");
+  wait(0);  // the interactive job
+  struct pstat_entry *c = lookup(t, cpu);
+  uint cpu_gained = c ? total_ticks(c) - cpu_before : 0;
+  int cpu_level = c ? c->level : -1;
+  kill(cpu);
+  wait(0);
+
+  printf("mlfqtest: %s: interactive job took %d ticks for %d rounds "
+         "at level %d; CPU-bound job got %d ticks at level %d\n",
+         t, msg[0], LECTURE_ROUNDS, msg[1], cpu_gained, cpu_level);
+  if (msg[1] != 0)
+    fail(t, "interactive job left the top level");
+  if (msg[0] > LECTURE_ROUNDS + 5)
+    fail(t, "interactive job was kept waiting for the CPU");
+  if (cpu_level != low)
+    fail(t, "CPU-bound job is not at the lowest level");
+  if (cpu_gained < LECTURE_ROUNDS / 2)
+    fail(t, "CPU-bound job did not get most of the CPU");
+  printf("mlfqtest: %s OK\n", t);
+}
+
+static void
+test_lecture(void)
+{
+  run_in_child("lecture", lecture_body);
+}
+
 // A forked child starts at the top level without inheriting the
 // parent's ticks, and its slot is cleared once it has been reaped.
 static void
@@ -598,21 +754,43 @@ test_badptr(void)
   printf("mlfqtest: %s OK\n", t);
 }
 
+static struct {
+  char *name;
+  void (*fn)(void);
+} tests[] = {
+  {"self", test_self},       {"unused", test_unused},
+  {"demote", test_demote},   {"iobound", test_iobound},
+  {"sleepticks", test_sleepticks}, {"rr", test_rr},
+  {"preempt", test_preempt}, {"boost", test_boost},
+  {"starve", test_starve},   {"gaming", test_gaming},
+  {"killexit", test_killexit}, {"lecture", test_lecture},
+  {"fork", test_fork},       {"badptr", test_badptr},
+};
+
+// mlfqtest          run every test in order
+// mlfqtest NAME...  run only the named tests
 int
 main(int argc, char *argv[])
 {
-  test_self();
-  test_unused();
-  test_demote();
-  test_iobound();
-  test_sleepticks();
-  test_rr();
-  test_preempt();
-  test_boost();
-  test_starve();
-  test_gaming();
-  test_fork();
-  test_badptr();
+  int n = sizeof(tests) / sizeof(tests[0]);
+  for (int i = 0; i < n; i++) {
+    int run = (argc == 1);
+    for (int a = 1; a < argc; a++)
+      if (strcmp(argv[a], tests[i].name) == 0)
+        run = 1;
+    if (run)
+      tests[i].fn();
+  }
+  for (int a = 1; a < argc; a++) {
+    int known = 0;
+    for (int i = 0; i < n; i++)
+      if (strcmp(argv[a], tests[i].name) == 0)
+        known = 1;
+    if (!known) {
+      printf("mlfqtest: unknown test %s\n", argv[a]);
+      exit(1);
+    }
+  }
   printf("mlfqtest: OK\n");
   exit(0);
 }

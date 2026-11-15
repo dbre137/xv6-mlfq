@@ -18,4 +18,5 @@
 #define MLFQ_LEVELS  3     // number of priority levels (0 = highest)
 #define MLFQ_QUANTA      {1, 2, 4}  // per level: ticks a process runs before it yields
 #define MLFQ_ALLOTMENTS  {2, 4, 0}  // per level: ticks used before demotion (0 = never)
+#define MLFQ_BOOST_INTERVAL 50     // ticks between priority boosts (0 = never boost)
 

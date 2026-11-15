@@ -92,6 +92,70 @@ total_ticks(struct pstat_entry *e)
   return sum;
 }
 
+// Make sure no priority boost happens in the next n ticks, by
+// sleeping past the next boost if it is due sooner. Tests that check
+// exact levels use this so a boost cannot land in the middle.
+static void
+avoid_boost(int n)
+{
+#if MLFQ_BOOST_INTERVAL > 0
+  int now = uptime();
+  int next_boost = (now / MLFQ_BOOST_INTERVAL + 1) * MLFQ_BOOST_INTERVAL;
+  if (next_boost - now <= n)
+    pause(next_boost - now + 1);
+#endif
+}
+
+// Run body() in a fresh child, which starts at level 0, and exit if
+// it fails. Earlier tests leave this process at the lowest level,
+// where it would compete for the CPU with the processes it watches.
+static void
+run_in_child(char *test, void (*body)(void))
+{
+  int pid = fork();
+  if (pid < 0)
+    fail(test, "fork failed");
+  if (pid == 0) {
+    body();
+    exit(0);
+  }
+  int status;
+  wait(&status);
+  if (status != 0)
+    exit(1);
+}
+
+// Use n ticks of this process's own CPU time (not wall-clock time,
+// which also counts time other processes are running).
+static void
+burn(int n)
+{
+  struct pstat_entry *e = lookup("burn", getpid());
+  uint target = total_ticks(e) + n;
+  while (total_ticks(lookup("burn", getpid())) < target)
+    for (volatile int i = 0; i < 1000000; i++)
+      ;
+}
+
+// Pause until pid's entry satisfies level == want_level and (if
+// want_state >= 0) state == want_state; fail after 100 ticks.
+static struct pstat_entry *
+await_level(char *test, int pid, int want_level, int want_state)
+{
+  for (int k = 0; k < 100; k++) {
+    struct pstat_entry *e = lookup(test, pid);
+    if (e != 0 && e->level == want_level &&
+        (want_state < 0 || e->state == want_state))
+      return e;
+    pause(1);
+  }
+  struct pstat_entry *e = lookup(test, pid);
+  printf("mlfqtest: %s: pid %d is at level %d in state %d, wanted level %d\n",
+         test, pid, e ? e->level : -1, e ? e->state : -1, want_level);
+  fail(test, "timed out waiting for a process to reach a level");
+  return 0;
+}
+
 // A CPU-bound process is charged one tick at a time at its current
 // level and is demoted once it has used that level's allotment:
 // exactly 2 ticks at level 0, then 4 at level 1, then it stays at
@@ -100,6 +164,7 @@ static void
 test_demote(void)
 {
   char *t = "demote";
+  avoid_boost(15);
   int pid = fork();
   if (pid < 0)
     fail(t, "fork failed");
@@ -213,6 +278,7 @@ test_preempt(void)
 {
   char *t = "preempt";
 
+  avoid_boost(20);
   spin(7);  // use up the level-0 and level-1 allotments (2 + 4 ticks)
   struct pstat_entry *me = lookup(t, getpid());
   if (me == 0 || me->level != MLFQ_LEVELS - 1)
@@ -239,6 +305,163 @@ test_preempt(void)
   printf("mlfqtest: %s OK\n", t);
 }
 
+// The periodic boost (every MLFQ_BOOST_INTERVAL ticks) moves every
+// process back to level 0: one that is asleep during the boost, and
+// one that is CPU-bound and runnable.
+static void
+boost_body(void)
+{
+  char *t = "boost";
+#if MLFQ_BOOST_INTERVAL == 0
+  printf("mlfqtest: %s skipped (MLFQ_BOOST_INTERVAL is 0)\n", t);
+#else
+  int low = MLFQ_LEVELS - 1;
+  int fds[2];
+
+  // The sleeper must reach the lowest level (7 ticks of CPU while
+  // sharing it with the runner) before the next boost.
+  avoid_boost(35);
+  int deadline = uptime() + 150;  // helpers exit by then regardless
+  if (pipe(fds) < 0)
+    fail(t, "pipe failed");
+
+  int runner = fork();
+  if (runner < 0)
+    fail(t, "fork failed");
+  if (runner == 0) {
+    while (uptime() < deadline)
+      burn(1);
+    exit(0);
+  }
+  int sleeper = fork();
+  if (sleeper < 0)
+    fail(t, "fork failed");
+  if (sleeper == 0) {
+    burn(7);  // past the level-0 and level-1 allotments (2 + 4)
+    int level = lookup(t, getpid())->level;
+    write(fds[1], &level, sizeof(level));  // report, then sleep
+    pause(deadline - uptime());
+    exit(0);
+  }
+
+  int level;
+  if (read(fds[0], &level, sizeof(level)) != sizeof(level))
+    fail(t, "no report from sleeper");
+  if (level != low)
+    fail(t, "sleeper did not reach the lowest level");
+  struct pstat_entry *r = lookup(t, runner);
+  if (r == 0 || r->level == 0)
+    fail(t, "runner should have left level 0 by now");
+  uint before = r->ticks[0];
+
+  // Sleep until just after the next boost.
+  int now = uptime();
+  int next_boost = (now / MLFQ_BOOST_INTERVAL + 1) * MLFQ_BOOST_INTERVAL;
+  pause(next_boost - now + 1);
+
+  struct pstat_entry *e = lookup(t, sleeper);
+  if (e == 0 || e->state != ST_SLEEPING || e->level != 0)
+    fail(t, "sleeping process was not boosted to level 0");
+  r = lookup(t, runner);
+  if (r == 0 || r->ticks[0] <= before)
+    fail(t, "CPU-bound process did not run at level 0 after the boost");
+
+  kill(runner);
+  kill(sleeper);
+  wait(0);
+  wait(0);
+  printf("mlfqtest: %s OK\n", t);
+#endif
+}
+
+static void
+test_boost(void)
+{
+  run_in_child("boost", boost_body);
+}
+
+// Starvation: a CPU-bound process at the lowest level runs alongside
+// two pairs of interactive processes that pass a byte back and forth
+// through pipes. In each pair one process is always runnable while
+// the other blocks in read(), so level 0 is never empty; and as each
+// one sleeps after every message, it never uses up its allotment and
+// stays at level 0. With the boost, the CPU-bound process still gets
+// CPU time in every boost interval; with MLFQ_BOOST_INTERVAL 0 it
+// starves.
+#define NPAIRS 2
+static void
+pingpong(int in, int out, int deadline)
+{
+  char c = 0;
+  while (uptime() < deadline) {
+    if (out >= 0)
+      write(out, &c, 1);
+    if (read(in, &c, 1) != 1)
+      exit(0);
+    out = out < 0 ? -out - 1 : out;
+  }
+  exit(0);
+}
+
+static void
+starve_body(void)
+{
+  char *t = "starve";
+  int low = MLFQ_LEVELS - 1;
+  int kids[2 * NPAIRS];
+
+  int deadline = uptime() + 200;  // helpers exit by then regardless
+  int cpu = fork();
+  if (cpu < 0)
+    fail(t, "fork failed");
+  if (cpu == 0) {
+    while (uptime() < deadline)
+      burn(1);
+    exit(0);
+  }
+  await_level(t, cpu, low, -1);
+
+  for (int k = 0; k < NPAIRS; k++) {
+    int ab[2], ba[2];
+    if (pipe(ab) < 0 || pipe(ba) < 0)
+      fail(t, "pipe failed");
+    if ((kids[2 * k] = fork()) == 0)
+      pingpong(ba[0], ab[1], deadline);      // A: writes first
+    if ((kids[2 * k + 1] = fork()) == 0)
+      pingpong(ab[0], -ba[1] - 1, deadline); // B: waits for A first
+    close(ab[0]); close(ab[1]); close(ba[0]); close(ba[1]);
+  }
+
+  pause(5);  // let the pairs get going
+  struct pstat_entry *e = lookup(t, cpu);
+  uint before = total_ticks(e);
+  pause(105);  // more than two 50-tick boost intervals
+  e = lookup(t, cpu);
+  uint gained = total_ticks(e) - before;
+
+  kill(cpu);
+  for (int k = 0; k < 2 * NPAIRS; k++)
+    kill(kids[k]);
+  for (int k = 0; k < 2 * NPAIRS + 1; k++)
+    wait(0);
+
+#if MLFQ_BOOST_INTERVAL > 0
+  if (gained < 2)
+    fail(t, "CPU-bound process starved despite the boost");
+#else
+  if (gained > 1)
+    fail(t, "CPU-bound process ran although nothing boosts it");
+#endif
+  printf("mlfqtest: %s OK (CPU-bound process got %d of 105 ticks)\n",
+         t, gained);
+}
+
+static void
+test_starve(void)
+{
+  run_in_child("starve", starve_body);
+}
+
 // A forked child starts at the top level without inheriting the
 // parent's ticks, and its slot is cleared once it has been reaped.
 static void
@@ -250,6 +473,7 @@ test_fork(void)
 
   // Use up the parent's level-0 allotment first, so we can tell
   // whether the child inherits the parent's level.
+  avoid_boost(8);
   spin(3);
   struct pstat_entry *me = lookup(t, getpid());
   if (me == 0 || me->level == 0)
@@ -307,6 +531,8 @@ main(int argc, char *argv[])
   test_sleepticks();
   test_rr();
   test_preempt();
+  test_boost();
+  test_starve();
   test_fork();
   test_badptr();
   printf("mlfqtest: OK\n");

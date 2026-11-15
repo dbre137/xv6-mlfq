@@ -979,6 +979,26 @@ mlfq_tick(void)
 #endif
 }
 
+// Priority boost: move every process back to the top level with a
+// fresh allotment, whether it is running, runnable or sleeping, so a
+// CPU-bound process cannot be starved for ever by higher levels.
+// Called from clockintr() every MLFQ_BOOST_INTERVAL ticks. Takes
+// each p->lock in turn; the caller must not hold any p->lock.
+void
+mlfq_boost(void)
+{
+  struct proc *p;
+
+  for (p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if (p->state != UNUSED) {
+      p->mlfq_level = 0;
+      p->mlfq_used = 0;
+    }
+    release(&p->lock);
+  }
+}
+
 // Copy an MLFQ snapshot of every process-table slot to the
 // struct pstat at user address addr. Each slot is read under its
 // own p->lock, so each entry is consistent, but the table as a

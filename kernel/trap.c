@@ -176,7 +176,16 @@ clockintr()
     acquire(&tickslock);
     ticks++;
     wakeup(&ticks);
+#if SCHED_MLFQ && MLFQ_BOOST_INTERVAL > 0
+    int boost = (ticks % MLFQ_BOOST_INTERVAL == 0);
+#endif
     release(&tickslock);
+#if SCHED_MLFQ && MLFQ_BOOST_INTERVAL > 0
+    // Periodic MLFQ priority boost. Interrupts are off here, so this
+    // CPU cannot be holding a p->lock, which mlfq_boost() acquires.
+    if(boost)
+      mlfq_boost();
+#endif
   }
 
   // ask for the next timer interrupt. this also clears

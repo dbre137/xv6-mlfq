@@ -467,6 +467,74 @@ test_starve(void)
   run_in_child("starve", starve_body);
 }
 
+// Gaming: a process that runs for about 70% of a tick, then sleeps
+// before the tick arrives, over and over. It is almost never running
+// when the timer fires, so counting ticks would never charge it.
+// With accounting across yields (MLFQ_ACCOUNT_ACROSS_YIELDS 1) its
+// measured CPU time builds up and it is demoted; under the naive rule
+// each sleep restarts its allotment and it stays at level 0.
+#define GAME_ROUNDS 12
+
+// Busy-loop for n iterations, checking the clock every 1000 like the
+// calibration loop below, so an iteration costs the same in both.
+static void
+loop(uint n)
+{
+  for (uint i = 0; i < n; i++)
+    if (i % 1000 == 0)
+      uptime();
+}
+
+static void
+gaming_body(void)
+{
+  char *t = "gaming";
+
+  // Calibrate: how many iterations fit in one tick? Start just after
+  // a tick and count until the next one.
+  pause(1);
+  int t0 = uptime();
+  uint per_tick = 0;
+  while (uptime() == t0)
+    for (int k = 0; k < 1000; k++, per_tick++)
+      if (k == 0)
+        uptime();
+
+  avoid_boost(40);
+  int pid = fork();
+  if (pid < 0)
+    fail(t, "fork failed");
+  if (pid == 0) {
+    for (int r = 0; r < GAME_ROUNDS; r++) {
+      pause(1);                    // wake just after a tick...
+      loop(per_tick * 7 / 10);     // ...run 70% of it...
+    }                              // ...and sleep before the next
+    struct pstat_entry *e = lookup(t, getpid());
+    printf("mlfqtest: %s: after %d rounds the gamer is at level %d, "
+           "with %d timer ticks recorded\n",
+           t, GAME_ROUNDS, e->level, total_ticks(e));
+#if MLFQ_ACCOUNT_ACROSS_YIELDS
+    if (e->level == 0)
+      fail(t, "gaming process was not demoted");
+#else
+    if (e->level != 0)
+      fail(t, "gaming process was demoted under the naive rule");
+#endif
+    exit(0);
+  }
+  int status;
+  wait(&status);
+  if (status != 0)
+    exit(1);
+  printf("mlfqtest: %s OK\n", t);
+}
+
+static void
+test_gaming(void)
+{
+  run_in_child("gaming", gaming_body);
+}
+
 // A forked child starts at the top level without inheriting the
 // parent's ticks, and its slot is cleared once it has been reaped.
 static void
@@ -538,6 +606,7 @@ main(int argc, char *argv[])
   test_preempt();
   test_boost();
   test_starve();
+  test_gaming();
   test_fork();
   test_badptr();
   printf("mlfqtest: OK\n");

@@ -92,6 +92,11 @@ struct proc {
   int xstate;           // Exit status to be returned to parent's wait
   int pid;              // Process ID
 
+  // MLFQ scheduling state; p->lock must be held too.
+  int mlfq_level;                // current level, 0 = highest
+  uint mlfq_used;                // ticks used at the current level
+  uint mlfq_ticks[MLFQ_LEVELS];  // ticks run at each level
+
   // wait_lock must be held when using this:
   struct proc *parent; // Parent process
 

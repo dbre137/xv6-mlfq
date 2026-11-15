@@ -146,3 +146,14 @@ sys_waitx(void)
 
   return kwaitx(addr, rtime_addr, stime_addr);
 }
+
+// getpinfo(struct pstat *ps): fill *ps with every process's
+// MLFQ level and per-level CPU ticks. Returns 0, or -1 on a bad pointer.
+uint64
+sys_getpinfo(void)
+{
+  uint64 addr;
+
+  argaddr(0, &addr);
+  return kgetpinfo(addr);
+}

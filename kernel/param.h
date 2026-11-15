@@ -13,3 +13,6 @@
 #define MAXPATH      128   // maximum file path name
 #define USERSTACK    1     // user stack pages
 
+// MLFQ scheduler
+#define MLFQ_LEVELS  3     // number of priority levels (0 = highest)
+

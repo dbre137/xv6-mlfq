@@ -5,10 +5,23 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "pstat.h"
 
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
+
+// Put p at the top MLFQ level with no ticks used or recorded.
+// Used for new processes (so a forked child starts at the top
+// level rather than inheriting its parent's level) and for freed
+// slots. Caller must hold p->lock.
+static void
+mlfq_reset(struct proc *p)
+{
+  p->mlfq_level = 0;
+  p->mlfq_used = 0;
+  memset(p->mlfq_ticks, 0, sizeof(p->mlfq_ticks));
+}
 
 struct proc *initproc;
 
@@ -127,6 +140,7 @@ found:
   p->priority = 10;
   p->runnable_ticks = 0;
   p->sleeping_ticks = 0;
+  mlfq_reset(p);
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -173,6 +187,7 @@ freeproc(struct proc *p)
   p->xstate = 0;
   p->state = UNUSED;
   p->priority = 0;
+  mlfq_reset(p);
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -835,6 +850,39 @@ kgetwaitstats(int pid, uint *r_ticks, uint *s_ticks)
     release(&p->lock);
   }
   return -1;
+}
+
+// Copy an MLFQ snapshot of every process-table slot to the
+// struct pstat at user address addr. Each slot is read under its
+// own p->lock, so each entry is consistent, but the table as a
+// whole is not one atomic snapshot. Returns 0, or -1 if addr is bad.
+int
+kgetpinfo(uint64 addr)
+{
+  struct proc *p;
+  struct pstat_entry e;
+  struct proc *me = myproc();
+
+  for (p = proc; p < &proc[NPROC]; p++) {
+    memset(&e, 0, sizeof(e));
+    acquire(&p->lock);
+    if (p->state != UNUSED) {
+      e.pid = p->pid;
+      e.state = p->state;
+      safestrcpy(e.name, p->name, sizeof(e.name));
+      e.level = p->mlfq_level;
+      e.ticks_used = p->mlfq_used;
+      memmove(e.ticks, p->mlfq_ticks, sizeof(e.ticks));
+    }
+    release(&p->lock);
+
+    // Copy out after releasing the lock: one entry at a time keeps
+    // the whole table off the small kernel stack.
+    uint64 dst = addr + (p - proc) * sizeof(e);
+    if (copyout(me->pagetable, dst, (char *)&e, sizeof(e)) < 0)
+      return -1;
+  }
+  return 0;
 }
 
 // wait for the child process to exit and return its pid.

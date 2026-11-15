@@ -11,3 +11,8 @@ _*
 /user/usys.S
 .gdbinit
 TAGS
+
+# Local macOS and editor files
+.DS_Store
+.idea/
+compile_commands.json

@@ -95,6 +95,7 @@ struct proc {
   // MLFQ scheduling state; p->lock must be held too.
   int mlfq_level;                // current level, 0 = highest
   uint mlfq_used;                // ticks used at the current level
+  uint mlfq_slice;               // ticks used since last dispatched
   uint mlfq_ticks[MLFQ_LEVELS];  // ticks run at each level
 
   // wait_lock must be held when using this:

@@ -92,33 +92,64 @@ total_ticks(struct pstat_entry *e)
   return sum;
 }
 
-// CPU time is charged to the running process's current level.
-// Nothing demotes yet, so it all lands on level 0.
+// A CPU-bound process is charged one tick at a time at its current
+// level and is demoted once it has used that level's allotment:
+// exactly 2 ticks at level 0, then 4 at level 1, then it stays at
+// the lowest level (allotments {2, 4, 0} in kernel/param.h).
 static void
-test_cputicks(void)
+test_demote(void)
 {
-  char *t = "cputicks";
-  struct pstat_entry *e = lookup(t, getpid());
-  if (e == 0)
-    fail(t, "own pid not in table");
-  uint before = e->ticks[0];
+  char *t = "demote";
+  int pid = fork();
+  if (pid < 0)
+    fail(t, "fork failed");
+  if (pid == 0) {
+    spin(10);
+    struct pstat_entry *e = lookup(t, getpid());
+    uint total = total_ticks(e);
+    printf("mlfqtest: %s: level %d, ticks %d/%d/%d\n", t, e->level,
+           e->ticks[0], e->ticks[1], e->ticks[2]);
+    if (e->ticks[0] != 2 || e->ticks[1] != 4)
+      fail(t, "expected 2 ticks at level 0 and 4 at level 1");
+    if (e->level != MLFQ_LEVELS - 1)
+      fail(t, "not at the lowest level");
+    // On one CPU with nothing else runnable, it gets nearly every tick.
+    if (total < 8 || total > 11)
+      fail(t, "expected 8-11 ticks in a 10-tick spin");
+    exit(0);
+  }
+  int status;
+  wait(&status);
+  if (status != 0)
+    exit(1);
+  printf("mlfqtest: %s OK\n", t);
+}
 
-  spin(10);
-
-  e = lookup(t, getpid());
-  uint gained = e->ticks[0] - before;
-  // On one CPU with nothing else runnable, we should get almost
-  // every one of the 10 ticks.
-  if (gained < 8)
-    fail(t, "fewer than 8 of 10 ticks counted at level 0");
-  if (gained > 11)
-    fail(t, "more ticks counted than elapsed");
-  for (int l = 1; l < MLFQ_LEVELS; l++)
-    if (e->ticks[l] != 0)
-      fail(t, "ticks counted below level 0");
-  if (e->ticks_used != e->ticks[0])
-    fail(t, "ticks_used differs from level-0 ticks");
-  printf("mlfqtest: %s OK (%d ticks at level 0)\n", t, gained);
+// An I/O-bound process, which sleeps every tick and uses very little
+// CPU, stays at the top level.
+static void
+test_iobound(void)
+{
+  char *t = "iobound";
+  int pid = fork();
+  if (pid < 0)
+    fail(t, "fork failed");
+  if (pid == 0) {
+    for (int k = 0; k < 20; k++)
+      pause(1);
+    struct pstat_entry *e = lookup(t, getpid());
+    if (e->level != 0)
+      fail(t, "I/O-bound process left level 0");
+    for (int l = 1; l < MLFQ_LEVELS; l++)
+      if (e->ticks[l] != 0)
+        fail(t, "I/O-bound process ran below level 0");
+    exit(0);
+  }
+  int status;
+  wait(&status);
+  if (status != 0)
+    exit(1);
+  printf("mlfqtest: %s OK\n", t);
 }
 
 // A process that sleeps is not charged for the time it sleeps.
@@ -183,9 +214,12 @@ test_fork(void)
   int fds[2];
   char c;
 
+  // Use up the parent's level-0 allotment first, so we can tell
+  // whether the child inherits the parent's level.
+  spin(3);
   struct pstat_entry *me = lookup(t, getpid());
-  if (me == 0 || me->ticks[0] < 2)
-    fail(t, "parent should have run for some ticks first");
+  if (me == 0 || me->level == 0)
+    fail(t, "parent should have been demoted first");
 
   if (pipe(fds) < 0)
     fail(t, "pipe failed");
@@ -204,7 +238,7 @@ test_fork(void)
   if (e == 0)
     fail(t, "child not in table");
   if (e->level != 0)
-    fail(t, "child not at level 0");
+    fail(t, "child inherited the parent's level");
   // The child has barely run (it blocks at once in read), so it may
   // have caught at most one tick, never the parent's count.
   if (e->ticks_used > 1 || total_ticks(e) > 1)
@@ -234,7 +268,8 @@ main(int argc, char *argv[])
 {
   test_self();
   test_unused();
-  test_cputicks();
+  test_demote();
+  test_iobound();
   test_sleepticks();
   test_rr();
   test_fork();

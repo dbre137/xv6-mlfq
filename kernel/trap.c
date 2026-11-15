@@ -80,11 +80,12 @@ usertrap(void)
   if(killed(p))
     kexit(-1);
 
-  // give up the CPU if this is a timer interrupt.
+  // on a timer interrupt, give up the CPU if the scheduler says so.
   if(which_dev == 2) {
-    mlfq_tick();
+    int yield_now = mlfq_tick();
     update_process_times();
-    yield();
+    if(yield_now)
+      yield();
   }
 
   prepare_return();
@@ -154,11 +155,12 @@ kerneltrap()
     panic("kerneltrap");
   }
 
-  // give up the CPU if this is a timer interrupt.
+  // on a timer interrupt, give up the CPU if the scheduler says so.
   if(which_dev == 2 && myproc() != 0) {
-    mlfq_tick();
+    int yield_now = mlfq_tick();
     update_process_times();
-    yield();
+    if(yield_now)
+      yield();
   }
 
   // the yield() may have caused some traps to occur,

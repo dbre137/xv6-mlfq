@@ -11,6 +11,14 @@ struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
 
+// MLFQ parameters from param.h, indexed by level.
+static const int mlfq_quanta[] __attribute__((unused)) = MLFQ_QUANTA;
+static const int mlfq_allotments[] __attribute__((unused)) = MLFQ_ALLOTMENTS;
+_Static_assert(sizeof(mlfq_quanta) / sizeof(int) == MLFQ_LEVELS,
+               "MLFQ_QUANTA needs one entry per level");
+_Static_assert(sizeof(mlfq_allotments) / sizeof(int) == MLFQ_LEVELS,
+               "MLFQ_ALLOTMENTS needs one entry per level");
+
 // Put p at the top MLFQ level with no ticks used or recorded.
 // Used for new processes (so a forked child starts at the top
 // level rather than inheriting its parent's level) and for freed
@@ -20,6 +28,7 @@ mlfq_reset(struct proc *p)
 {
   p->mlfq_level = 0;
   p->mlfq_used = 0;
+  p->mlfq_slice = 0;
   memset(p->mlfq_ticks, 0, sizeof(p->mlfq_ticks));
 }
 
@@ -603,6 +612,7 @@ mlfq_scheduler(void)
         acquire(&p->lock);
         if (p->state == RUNNABLE && p->mlfq_level == level) {
           next[level] = (idx + 1) % NPROC;
+          p->mlfq_slice = 0;  // a fresh quantum each time it is dispatched
           p->state = RUNNING;
           c->proc = p;
           swtch(&c->context, &p->context);
@@ -733,6 +743,9 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
+  // MLFQ, naive accounting: giving up the CPU before the allotment
+  // runs out starts the allotment again.
+  p->mlfq_used = 0;
 
   sched();
 
@@ -902,21 +915,38 @@ kgetwaitstats(int pid, uint *r_ticks, uint *s_ticks)
   return -1;
 }
 
-// Charge the current timer tick to the running process: count it
-// at the process's current level and as time used at that level.
-// Called on every timer interrupt that arrives while a process is
-// running (from usertrap() and kerneltrap()), before it yields.
-void
+// Charge the current timer tick to the running process and decide
+// whether it should give up the CPU. Called on every timer interrupt
+// that arrives while a process is running (from usertrap() and
+// kerneltrap()). Returns 1 if the caller should yield().
+//
+// Under MLFQ, a process that has used its allotment at its level is
+// demoted one level (never below the lowest), and a process that has
+// used its quantum yields so others at its level get a turn. With
+// SCHED_MLFQ 0 it always returns 1: round-robin yields every tick.
+int
 mlfq_tick(void)
 {
   struct proc *p = myproc();
+  int yield_now = 1;
 
   if (p == 0)
-    return;
+    return 0;
   acquire(&p->lock);
   p->mlfq_ticks[p->mlfq_level]++;
   p->mlfq_used++;
+  p->mlfq_slice++;
+#if SCHED_MLFQ
+  int allot = mlfq_allotments[p->mlfq_level];
+  if (p->mlfq_level < MLFQ_LEVELS - 1 && allot > 0 && p->mlfq_used >= allot) {
+    p->mlfq_level++;
+    p->mlfq_used = 0;
+  } else if (p->mlfq_slice < mlfq_quanta[p->mlfq_level]) {
+    yield_now = 0;
+  }
+#endif
   release(&p->lock);
+  return yield_now;
 }
 
 // Copy an MLFQ snapshot of every process-table slot to the

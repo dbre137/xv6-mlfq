@@ -287,9 +287,26 @@ game(void)
   printf("\n");
 }
 
+// Print the configuration this program was built with, so every
+// result can be traced to its settings.
+static void
+config(void)
+{
+  int q[] = MLFQ_QUANTA, al[] = MLFQ_ALLOTMENTS;
+  printf("CONFIG sched=%s quanta=", SCHED_MLFQ ? "mlfq" : "rr");
+  for (int l = 0; l < MLFQ_LEVELS; l++)
+    printf(l ? ",%d" : "%d", q[l]);
+  printf(" allotments=");
+  for (int l = 0; l < MLFQ_LEVELS; l++)
+    printf(l ? ",%d" : "%d", al[l]);
+  printf(" boost=%d across=%d\n", MLFQ_BOOST_INTERVAL,
+         MLFQ_ACCOUNT_ACROSS_YIELDS);
+}
+
 int
 main(int argc, char *argv[])
 {
+  config();
   if (argc == 3 && strcmp(argv[1], "cpu") == 0) {
     bench(atoi(argv[2]), 0);
   } else if (argc == 3 && strcmp(argv[1], "io") == 0) {

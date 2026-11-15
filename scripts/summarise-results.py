@@ -39,7 +39,10 @@ for line in open(path):
     words = rest.split()
     key = words[0] if "=" not in words[0] else None
     fields = OrderedDict(w.split("=", 1) for w in words if "=" in w)
-    key = fields.pop("kind", key)
+    if "kind" in fields:
+        kind_ = fields.pop("kind")
+        key = fields.pop("workload", None)
+        key = f"{key}: {kind_}" if key else kind_
     row = data[name]["rows"].setdefault(key, OrderedDict())
     for k, v in fields.items():
         try:

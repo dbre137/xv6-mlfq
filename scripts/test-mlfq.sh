@@ -12,6 +12,6 @@ scripts/run-xv6.py --timeout 150 "$@" \
   --expect '^  PID STATE  LVL  TICKS/LEVEL      NAME$' \
   --expect '^ +1 sleep +0 .* init$' \
   --expect '^ +[0-9]+ run +0 .* mlfqps$' \
-  --expect '^RESULT kind=cpu n=2 turnaround=[0-9]+\.[0-9] ' \
-  --expect '^RESULT kind=io n=2 turnaround=[0-9]+\.[0-9] ' \
+  --expect '^RESULT workload=mixed kind=cpu n=2 turnaround=[0-9]+\.[0-9] ' \
+  --expect '^RESULT workload=mixed kind=io n=2 turnaround=[0-9]+\.[0-9] ' \
   mlfqtest mlfqps 'mlfqbench mixed 2'

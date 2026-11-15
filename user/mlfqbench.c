@@ -12,9 +12,10 @@
 //       pairs that keep level 0 busy, for 300 ticks: how many ticks
 //       it got and the longest gap between two of them.
 //
-//   mlfqbench game      A gaming process (runs 70% of each tick, sleeps
-//       before the next) against a CPU-bound process, for 200 ticks:
-//       how many ticks of CPU each got, measured by work done.
+//   mlfqbench game      A gaming process (runs about 70% of each tick,
+//       sleeps before the next) against a CPU-bound process, for 200
+//       ticks: how many ticks of CPU each got, as measured by the
+//       kernel (getpinfo cputime), which tick sampling cannot see.
 
 #include "kernel/types.h"
 #include "kernel/param.h"
@@ -75,6 +76,18 @@ cpu_ticks(int pid)
   return 0;
 }
 
+// This process's kernel-measured CPU time, in hundredths of a tick.
+static uint
+my_cputime(void)
+{
+  if (getpinfo(&ps) < 0)
+    return 0;
+  for (int i = 0; i < NPROC; i++)
+    if (ps.proc[i].state != 0 && ps.proc[i].pid == getpid())
+      return ps.proc[i].cputime;
+  return 0;
+}
+
 // ---- cpu / io / mixed ----
 
 struct job {
@@ -102,7 +115,7 @@ run_job(int io)
 }
 
 static void
-report(char *kind, struct job *jobs, int n, int io)
+report(char *workload, char *kind, struct job *jobs, int n, int io)
 {
   int k = 0, turn = 0, wait = 0, resp = 0, maxresp = 0;
   for (int i = 0; i < n; i++) {
@@ -118,7 +131,7 @@ report(char *kind, struct job *jobs, int n, int io)
   }
   if (k == 0)
     return;
-  printf("RESULT kind=%s n=%d", kind, k);
+  printf("RESULT workload=%s kind=%s n=%d", workload, kind, k);
   print10("turnaround", turn * 10 / k);
   print10("waiting", wait * 10 / k);
   print10("response", resp * 10 / k);
@@ -126,7 +139,7 @@ report(char *kind, struct job *jobs, int n, int io)
 }
 
 static void
-bench(int ncpu, int nio)
+bench(char *workload, int ncpu, int nio)
 {
   struct job jobs[MAXJOBS];
   int n = 0, fds[2];
@@ -173,8 +186,8 @@ bench(int ncpu, int nio)
       if (jobs[i].pid == msg[0])
         jobs[i].started = msg[1];
 
-  report("cpu", jobs, n, 0);
-  report("io", jobs, n, 1);
+  report(workload, "cpu", jobs, n, 0);
+  report(workload, "io", jobs, n, 1);
 }
 
 // ---- starve ----
@@ -257,20 +270,18 @@ game(void)
     if (fork() == 0) {
       while (uptime() < start)
         pause(1);
-      uint done = 0;
+      uint before = my_cputime();
       if (who == 0) {             // CPU-bound
-        while (uptime() < deadline) {
+        while (uptime() < deadline)
           loop(per_tick / 10);
-          done += per_tick / 10;
-        }
       } else {                    // gamer
         while (uptime() < deadline) {
           pause(1);
           loop(per_tick * 7 / 10);
-          done += per_tick * 7 / 10;
         }
       }
-      int msg[2] = {who, (int)(done * 10 / per_tick)};  // tenths of ticks
+      // CPU used in the window, in tenths of a tick.
+      int msg[2] = {who, (int)((my_cputime() - before) / 10)};
       write(fds[1], msg, sizeof(msg));
       exit(0);
     }
@@ -278,10 +289,13 @@ game(void)
   close(fds[1]);
   wait(0);
   wait(0);
+  // Each child's last piece of work may run a little past the
+  // deadline, so report the time actually taken as well.
+  int elapsed = uptime() - start;
   int got[2] = {0, 0}, msg[2];
   while (read(fds[0], msg, sizeof(msg)) == sizeof(msg))
     got[msg[0]] = msg[1];
-  printf("RESULT game window=%d", window);
+  printf("RESULT game window=%d elapsed=%d", window, elapsed);
   print10("cpubound", got[0]);
   print10("gamer", got[1]);
   printf("\n");
@@ -308,11 +322,11 @@ main(int argc, char *argv[])
 {
   config();
   if (argc == 3 && strcmp(argv[1], "cpu") == 0) {
-    bench(atoi(argv[2]), 0);
+    bench("cpu", atoi(argv[2]), 0);
   } else if (argc == 3 && strcmp(argv[1], "io") == 0) {
-    bench(0, atoi(argv[2]));
+    bench("io", 0, atoi(argv[2]));
   } else if (argc == 3 && strcmp(argv[1], "mixed") == 0) {
-    bench(atoi(argv[2]), atoi(argv[2]));
+    bench("mixed", atoi(argv[2]), atoi(argv[2]));
   } else if (argc == 2 && strcmp(argv[1], "starve") == 0) {
     starve();
   } else if (argc == 2 && strcmp(argv[1], "game") == 0) {

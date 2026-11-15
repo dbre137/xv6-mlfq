@@ -915,6 +915,26 @@ kgetwaitstats(int pid, uint *r_ticks, uint *s_ticks)
   return -1;
 }
 
+#if SCHED_MLFQ
+// Is any process at a level higher than (numerically below) level
+// RUNNABLE? Takes each p->lock in turn; the caller must not hold any
+// p->lock, so we never hold two process locks at once.
+static int
+mlfq_higher_runnable(int level)
+{
+  struct proc *p;
+
+  for (p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    int higher = p->state == RUNNABLE && p->mlfq_level < level;
+    release(&p->lock);
+    if (higher)
+      return 1;
+  }
+  return 0;
+}
+#endif
+
 // Charge the current timer tick to the running process and decide
 // whether it should give up the CPU. Called on every timer interrupt
 // that arrives while a process is running (from usertrap() and
@@ -922,7 +942,8 @@ kgetwaitstats(int pid, uint *r_ticks, uint *s_ticks)
 //
 // Under MLFQ, a process that has used its allotment at its level is
 // demoted one level (never below the lowest), and a process that has
-// used its quantum yields so others at its level get a turn. With
+// used its quantum yields so others at its level get a turn. It also
+// yields if a process at a higher level is waiting to run. With
 // SCHED_MLFQ 0 it always returns 1: round-robin yields every tick.
 int
 mlfq_tick(void)
@@ -944,9 +965,18 @@ mlfq_tick(void)
   } else if (p->mlfq_slice < mlfq_quanta[p->mlfq_level]) {
     yield_now = 0;
   }
-#endif
+  int level = p->mlfq_level;
+  release(&p->lock);
+
+  // Even mid-quantum, give way if a process at a higher level has
+  // become runnable (e.g. woken from sleep) since we were dispatched.
+  if (!yield_now && mlfq_higher_runnable(level))
+    yield_now = 1;
+  return yield_now;
+#else
   release(&p->lock);
   return yield_now;
+#endif
 }
 
 // Copy an MLFQ snapshot of every process-table slot to the

@@ -205,6 +205,40 @@ test_rr(void)
   printf("mlfqtest: %s OK\n", t);
 }
 
+// A process that becomes runnable at a higher level preempts a
+// lower-level process mid-quantum, within one tick, instead of
+// waiting for the lower-level process's quantum (4 ticks at level 2).
+static void
+test_preempt(void)
+{
+  char *t = "preempt";
+
+  spin(7);  // use up the level-0 and level-1 allotments (2 + 4 ticks)
+  struct pstat_entry *me = lookup(t, getpid());
+  if (me == 0 || me->level != MLFQ_LEVELS - 1)
+    fail(t, "parent should be at the lowest level");
+
+  pause(1);  // come back with a fresh 4-tick quantum
+  int t0 = uptime();
+  int pid = fork();
+  if (pid < 0)
+    fail(t, "fork failed");
+  if (pid == 0) {
+    int waited = uptime() - t0;
+    if (waited > 1) {
+      printf("mlfqtest: %s: child waited %d ticks\n", t, waited);
+      exit(1);
+    }
+    exit(0);
+  }
+  spin(6);  // stay CPU-bound while the child is waiting
+  int status;
+  wait(&status);
+  if (status != 0)
+    fail(t, "level-0 child waited more than 1 tick to run");
+  printf("mlfqtest: %s OK\n", t);
+}
+
 // A forked child starts at the top level without inheriting the
 // parent's ticks, and its slot is cleared once it has been reaped.
 static void
@@ -272,6 +306,7 @@ main(int argc, char *argv[])
   test_iobound();
   test_sleepticks();
   test_rr();
+  test_preempt();
   test_fork();
   test_badptr();
   printf("mlfqtest: OK\n");

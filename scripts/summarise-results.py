@@ -23,7 +23,7 @@ for line in open(path):
     if line.startswith("#"):
         block += 1
         continue
-    m = re.match(r"(\S+) run=(\d+) (CONFIG|RESULT) (.*)", line)
+    m = re.match(r"(\S+) run=(\d+) (CONFIG|RESULT|ERROR) (.*)", line)
     if not m:
         continue
     name, _run, kind, rest = m.groups()
@@ -33,6 +33,9 @@ for line in open(path):
         data.move_to_end(name)
     if kind == "CONFIG":
         data[name]["config"] = rest
+        continue
+    if kind == "ERROR":
+        data[name].setdefault("errors", []).append(rest)
         continue
     # "RESULT kind=cpu n=4 ..." or "RESULT starve window=300 ...":
     # the workload is the kind= value or the leading bare word.
@@ -79,7 +82,9 @@ def table(names, title):
             print(f"| {n} | {key} | {runs} | " + " | ".join(cells) + " |")
     print()
     for n in names:
-        print(f"- `{n}`: {data[n]['config']}")
+        errs = data[n].get("errors", [])
+        note = f" ({len(errs)} run(s) failed: {errs[0]})" if errs else ""
+        print(f"- `{n}`: {data[n]['config']}{note}")
     print()
 
 

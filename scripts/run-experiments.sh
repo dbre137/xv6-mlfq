@@ -9,8 +9,9 @@
 
 set -u
 cd "$(dirname "$0")/.."
-OUT=docs/experiments/raw.txt
-RUNS=3
+OUT=${OUT:-docs/experiments/raw.txt}  # environment overrides, e.g. for a
+RUNS=${RUNS:-3}                        # quick trial: RUNS=1 OUT=/tmp/x.txt
+TIMEOUT=${TIMEOUT:-300}                 # seconds allowed per command
 mkdir -p docs/experiments
 
 # run NAME DEFS COMMAND...: build with MLFQ_DEFS=DEFS, then RUNS boots.
@@ -22,8 +23,16 @@ run() {
     echo "build failed for $name" >&2; exit 1
   fi
   for r in $(seq 1 $RUNS); do
-    scripts/run-xv6.py --no-build --timeout 300 "$@" 2>&1 |
-      grep -E '^(CONFIG|RESULT)' | sed "s/^/$name run=$r /" | tee -a "$OUT" >&2
+    local log
+    log=$(scripts/run-xv6.py --no-build --timeout "$TIMEOUT" "$@" 2>&1)
+    local status=$?
+    echo "$log" | grep -E '^(CONFIG|RESULT)' | sed "s/^/$name run=$r /" | tee -a "$OUT" >&2
+    # Record failed runs (e.g. a command timing out) instead of
+    # silently leaving them out of the results.
+    if [ $status -ne 0 ]; then
+      echo "$name run=$r ERROR run-xv6.py exit $status: $(echo "$log" | grep '^run-xv6:' | tr '\n' ' ')" |
+        tee -a "$OUT" >&2
+    fi
   done
 }
 

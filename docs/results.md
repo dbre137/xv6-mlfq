@@ -113,6 +113,29 @@ Measurements:
 - `e4-across0`: sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=0
 - `e4-across1`: sched=mlfq quanta=1,2,4 allotments=2,4,0 boost=50 across=1
 
+### Baseline programs under MLFQ
+
+The step-1 baseline ([baseline-rr.md](baseline-rr.md)) used the course's
+`uoa_*` programs. The same command, rerun under the default MLFQ at commit
+`e1e5ef1` (3 boots):
+
+```sh
+scripts/run-xv6.py --timeout 300 'uoa_exectime uoa_cpubound 10' 'uoa_exectime uoa_iobound' 'uoa_testschd'
+```
+
+| Measurement (ticks) | Round-robin (3 runs) | MLFQ (3 runs) |
+|---|---:|---:|
+| `uoa_exectime uoa_cpubound 10` (alone) | 24, 24, 25 | 25, 25, 25 |
+| `uoa_exectime uoa_iobound` (alone) | 4, 5, 5 | 6, 6, 7 |
+| `uoa_testschd` average CPU-bound wait time | 19, 19, 18 | 22, 24, 24 |
+| `uoa_testschd` average I/O-bound wait time | 27, 24, 25 | 26, 27, 26 |
+
+`uoa_testschd`'s "wait time" is runnable plus sleeping ticks from
+`waitx()`, and `uoa_iobound` writes and deletes files, so for the
+I/O-bound jobs it mostly measures time asleep waiting for the disk rather
+than time waiting for the CPU. `uoa_iobound` alone taking 1-2 ticks longer
+under MLFQ was not investigated further.
+
 ## Measurement caveats
 
 These affect how the numbers can be read; they apply equally to every

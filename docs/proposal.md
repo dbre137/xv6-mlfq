@@ -1,4 +1,12 @@
-## 1. What I would like to build
+# Assignment 4 proposal
+
+## Proposal email
+
+Hi Talia, Thomas and Zalan,
+
+Please find my Assignment 4 proposal below. AI was used to help put this together.
+
+### 1. What I would like to build
 
 I would like to replace xv6's round-robin scheduler with a multi-level feedback queue (MLFQ) scheduler, following the rules covered in Lecture 8 (Advanced Scheduling) and OSTEP Chapter 8. Instead of priorities being set by hand, the scheduler will learn them from each process's behaviour:
 
@@ -9,7 +17,7 @@ I would like to replace xv6's round-robin scheduler with a multi-level feedback 
 
 Time will be accounted across yields, so a process cannot avoid demotion by giving up the CPU just before its quantum ends. I will then evaluate the scheduler against xv6's default round-robin scheduler using CPU-bound, I/O-bound and mixed workloads, and compare different parameter choices.
 
-## 2. Language and parts of the OS I expect to change
+### 2. Language and parts of the OS I expect to change
 
 I will use C. I expect to change:
 
@@ -20,7 +28,7 @@ I will use C. I expect to change:
 - A new system call (with the usual syscall.c, syscall.h, sysproc.c, usys.pl and user.h changes) reporting each process's level and per-level CPU ticks.
 - New user programs for tests and workloads, and a ps-style tool that shows levels while the system runs.
 
-## 3. How this differs from Assignments 1-3
+### 3. How this differs from Assignments 1-3
 
 The brief lists taking a mechanism studied earlier, implementing a more advanced version and comparing the design choices as a possible direction, and this project follows that direction. Assignment 1's scheduler used two static priorities that processes set themselves with setpri(), on a single CPU, with the timer still preempting on every tick. This project goes substantially further:
 
@@ -32,7 +40,7 @@ The brief lists taking a mechanism studied earlier, implementing a more advanced
 
 It also includes a quantitative evaluation, which none of the earlier assignments required.
 
-## 4. Design choices and trade-offs I expect to explore
+### 4. Design choices and trade-offs I expect to explore
 
 - Quantum length per level: short quanta at the top give interactive processes good response time but cause more context switches. I will measure response time against throughput for several settings.
 - Boost interval: frequent boosts make MLFQ behave like round-robin and weaken prioritisation, while infrequent boosts let CPU-bound processes starve behind interactive ones. I will measure the longest gap a CPU-bound process waits for the CPU under different intervals.
@@ -40,7 +48,7 @@ It also includes a quantitative evaluation, which none of the earlier assignment
 
 I will also decide and document whether forked children start at the top level or inherit their parent's level.
 
-## 5. Main steps
+### 5. Main steps
 
 Core goals:
 
@@ -55,7 +63,7 @@ Stretch goal, only if time allows: extend the scheduler to multiple CPUs and exa
 
 I will use Git throughout with small, descriptive commits, adding tests alongside each step rather than at the end.
 
-## 6. Testing and demonstration
+### 6. Testing and demonstration
 
 - Behaviour tests using the statistics system call: a CPU-bound process reaches the lowest level within the expected number of ticks, an I/O-bound process stays at the top level, and a boost returns every process to the top.
 - Lecture trace: reproduce Lecture 8's scenario of one CPU-bound job and one interactive job, and check that the interactive job stays responsive while the CPU-bound job still makes progress.
@@ -67,3 +75,13 @@ I will use Git throughout with small, descriptive commits, adding tests alongsid
 
 For the demonstration, I will run the mixed workload with the ps-style tool showing processes moving between levels, then run the starvation and gaming tests.
 
+Thank you for considering my proposal.
+
+Kind regards,
+Daniel Breen
+
+## Reply from the teaching staff
+
+Hi Daniel,
+
+Sorry for the late reply -- this looks good to us. Please make sure you submit it by the last day of the examination period.

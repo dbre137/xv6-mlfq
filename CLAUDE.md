@@ -40,6 +40,6 @@
   `kernel/kernel`, `compile_commands.json`, `.idea/`.
 
 ## Known quirks
-- `usertests` looks for a file named `README`, but the Makefile only puts
-  `README.xv6` on the disk image, so the first file test fails until that is fixed.
+- `usertests` opens a file named `README`; the Makefile copies `README.xv6` to
+  `user/README` (ignored by git) so it is on the disk image under that name.
 - xv6's shell has no history or tab completion; arrow keys insert junk characters.

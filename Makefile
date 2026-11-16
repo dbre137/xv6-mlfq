@@ -155,15 +155,20 @@ UPROGS=\
 	$U/_mlfqps\
 	$U/_mlfqbench\
 
-fs.img: mkfs/mkfs README.xv6 $(UPROGS)
-	mkfs/mkfs fs.img README.xv6 $(UPROGS)
+# usertests opens a file named README, so put a copy of README.xv6 on
+# the disk image under that name (mkfs drops the leading user/).
+$U/README: README.xv6
+	cp README.xv6 $U/README
+
+fs.img: mkfs/mkfs README.xv6 $U/README $(UPROGS)
+	mkfs/mkfs fs.img README.xv6 $U/README $(UPROGS)
 
 -include kernel/*.d user/*.d
 
 clean: 
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*/*.o */*.d */*.asm */*.sym \
-	$K/kernel fs.img \
+	$K/kernel fs.img $U/README \
 	mkfs/mkfs .gdbinit \
         $U/usys.S \
 	$(UPROGS)

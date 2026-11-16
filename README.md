@@ -50,12 +50,12 @@ quits QEMU, so none of them wait for input.
 | Command | What it checks | Time |
 |---|---|---|
 | `scripts/test-mlfq.sh` | `mlfqtest` (all MLFQ tests below), `mlfqps` output and a short `mlfqbench` run | ~1 min |
-| `scripts/run-usertests.sh` | every `usertests` quick test, one by one (regression) | ~3 min |
+| `scripts/run-xv6.py --timeout 900 --expect "ALL TESTS PASSED" "usertests -q"` | xv6's own regression tests, as one run (`usertests -q` inside xv6) | ~1 min |
+| `scripts/run-usertests.sh` | every `usertests` quick test, one by one, reporting each failure separately | ~3 min |
 | `scripts/run-xv6.py CMD...` | runs any xv6 shell commands and prints the console output, e.g. `scripts/run-xv6.py 'mlfqtest lecture'` | |
 
 `scripts/test-mlfq.sh` and `scripts/run-usertests.sh` exit with status 0 when
-everything passes. `run-usertests.sh` treats the two tests affected by the
-README problem (see Known limitations) as expected failures.
+everything passes.
 
 `mlfqtest` (in `user/mlfqtest.c`) can also be run inside xv6, either all
 tests (`mlfqtest`) or only some (`mlfqtest demote boost`). It prints
@@ -138,6 +138,7 @@ Each configuration is built with `MLFQ_DEFS` and booted three times, running
 | `kernel/pstat.h`, `syscall.*`, `sysproc.c`, `user/usys.pl`, `user/user.h` | the `getpinfo()` system call |
 | `user/mlfqtest.c`, `user/mlfqps.c`, `user/mlfqbench.c` | tests, ps-style tool, workloads |
 | `scripts/` | test, regression and experiment scripts |
+| `Makefile` | `CPUS := 1`, `MLFQ_DEFS`, the new programs, and a copy of `README.xv6` named `README` on the disk image (needed by `usertests`) |
 
 ## Assumptions
 
@@ -149,11 +150,6 @@ Each configuration is built with `MLFQ_DEFS` and booted three times, running
 
 ## Known limitations
 
-- **`usertests -q` stops at its first test.** `copyout` and `lazy_copy`
-  open a file named `README`, but the Makefile puts `README.xv6` on the disk
-  image. This comes from the starter code and was left unchanged;
-  `scripts/run-usertests.sh` runs the other quick tests individually, and all
-  of them pass.
 - **Intermittent stall, cause unknown.** A few times during development and
   in 3 of 24 runs of one experiment, xv6 stopped with a process RUNNABLE
   until a console interrupt arrived. It could not be reproduced in dozens of
@@ -164,7 +160,6 @@ Each configuration is built with `MLFQ_DEFS` and booted three times, running
 - `getpinfo()`'s `cputime` is measured by the MLFQ scheduler only, so it is
   0 when built with `SCHED_MLFQ=0`.
 - Tested on macOS with Homebrew's GCC 16 toolchain and on Ubuntu 24.04 with
-  `riscv64-linux-gnu-gcc` 13.3.0 (a fresh clone: clean build,
-  `scripts/test-mlfq.sh` passes, `scripts/run-usertests.sh` 56/58 with only
-  the two README failures). The build uses `-Werror`, so other compiler
+  `riscv64-linux-gnu-gcc` 13.3.0 (a fresh clone: clean build and
+  `scripts/test-mlfq.sh` passes). The build uses `-Werror`, so other compiler
   versions may report different warnings.

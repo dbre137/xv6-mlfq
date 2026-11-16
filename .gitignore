@@ -9,6 +9,7 @@ _*
 /mkfs/mkfs
 /kernel/kernel
 /user/usys.S
+/user/README
 .gdbinit
 TAGS
 

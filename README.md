@@ -163,6 +163,8 @@ Each configuration is built with `MLFQ_DEFS` and booted three times, running
   gaming workload) are described in [docs/results.md](docs/results.md).
 - `getpinfo()`'s `cputime` is measured by the MLFQ scheduler only, so it is
   0 when built with `SCHED_MLFQ=0`.
-- Developed and tested on macOS with Homebrew's GCC 16 toolchain. The build
-  uses `-Werror`, so a different compiler version may report different
-  warnings.
+- Tested on macOS with Homebrew's GCC 16 toolchain and on Ubuntu 24.04 with
+  `riscv64-linux-gnu-gcc` 13.3.0 (a fresh clone: clean build,
+  `scripts/test-mlfq.sh` passes, `scripts/run-usertests.sh` 56/58 with only
+  the two README failures). The build uses `-Werror`, so other compiler
+  versions may report different warnings.

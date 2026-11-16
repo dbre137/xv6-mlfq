@@ -9,7 +9,8 @@ process sleeps, so a process cannot avoid demotion by sleeping just before a
 tick. The project also includes a statistics system call, tests, a ps-style
 tool and the experiments comparing MLFQ with round-robin.
 
-- Approved plan: [docs/proposal.md](docs/proposal.md)
+- Report (two pages): [docs/report.pdf](docs/report.pdf), with its text in [docs/report.md](docs/report.md)
+- Approved plan, with the staff approval: [docs/proposal.md](docs/proposal.md)
 - Round-robin baseline: [docs/baseline-rr.md](docs/baseline-rr.md)
 - Experiment method, results and measurement caveats: [docs/results.md](docs/results.md)
 

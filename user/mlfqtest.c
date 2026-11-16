@@ -621,72 +621,152 @@ test_killexit(void)
   run_in_child("killexit", killexit_body);
 }
 
-// Lecture 8 scenario: one long-running CPU-bound job and one
-// interactive job that does a little work and then waits for "I/O"
-// (a one-tick sleep), 20 times. The interactive job should stay at
-// the top level and get the CPU as soon as it wakes, so its 20 rounds
-// take about 20 ticks; the CPU-bound job should sink to the lowest
-// level but still get most of the CPU.
-#define LECTURE_ROUNDS 20
+// Lecture 8, slides 12-13, with one "unit" = one timer tick. Job A
+// arrives at time 0 and is always ready; job B arrives at time 6 and
+// repeatedly runs for 1 tick, then waits 4 ticks for "input" (a
+// sleep). Usage is accumulated across turns and there is a periodic
+// boost. Time 0 is just after a boost, and the trace runs until a
+// little after the next one. Slide 13 says that:
+//  - A uses up its allotments and moves down to the lowest level;
+//  - B blocks after short bursts, so it stays near (not always at)
+//    the top: its 1-tick bursts still add up to its allotment;
+//  - when B becomes ready above A, it gets the CPU straight away;
+//  - the boost returns both to the top, so A is not starved.
+// After each round B records its own level, A's level, and how many
+// ticks late it got the CPU back after its sleep.
+//
+// With these numbers B never has to preempt A: when B sleeps, A is
+// dispatched with a fresh quantum, and at the lowest level that is 4
+// ticks, so it ends on the same tick that B's 4-tick wait does. The
+// preempt test checks preemption on its own.
+#define LECTURE_ARRIVAL   6
+#define LECTURE_RUN       1
+#define LECTURE_WAIT      4
+#define LECTURE_MAXROUNDS 64
+
+struct lecture_round {
+  int blevel;  // B's level when it woke
+  int alevel;  // A's level when B woke
+  int late;    // ticks between B's wakeup and B running
+};
+#if MLFQ_BOOST_INTERVAL > 0
+static struct lecture_round rounds[LECTURE_MAXROUNDS];
+#endif
+
 static void
 lecture_body(void)
 {
   char *t = "lecture";
+#if MLFQ_BOOST_INTERVAL == 0
+  printf("mlfqtest: %s skipped (the trace needs a boost)\n", t);
+#else
   int low = MLFQ_LEVELS - 1;
 
-  avoid_boost(LECTURE_ROUNDS + 20);
-  int deadline = uptime() + 100;  // helper exits by then regardless
-  int cpu = fork();
-  if (cpu < 0)
+  int now = uptime();  // start just after a boost
+  pause((now / MLFQ_BOOST_INTERVAL + 1) * MLFQ_BOOST_INTERVAL - now + 1);
+  int end = uptime() + MLFQ_BOOST_INTERVAL + 15;
+
+  int a = fork();
+  if (a < 0)
     fail(t, "fork failed");
-  if (cpu == 0) {
-    while (uptime() < deadline)
+  if (a == 0) {
+    while (uptime() < end + 20)  // exits by then regardless
       burn(1);
     exit(0);
   }
-  await_level(t, cpu, low, -1);
-  uint cpu_before = total_ticks(lookup(t, cpu));
+
+  pause(LECTURE_ARRIVAL);
+  struct pstat_entry *e = lookup(t, a);
+  if (e == 0)
+    fail(t, "job A is not in the table");
+  int a_level = e->level;
+  uint a_top_before = e->ticks[0];
+  uint a_total_before = total_ticks(e);
+  int b_start = uptime();
 
   int fds[2];
   if (pipe(fds) < 0)
     fail(t, "pipe failed");
-  int inter = fork();
-  if (inter < 0)
+  int b = fork();
+  if (b < 0)
     fail(t, "fork failed");
-  if (inter == 0) {
-    int t0 = uptime();
-    for (int r = 0; r < LECTURE_ROUNDS; r++) {
-      for (volatile int i = 0; i < 20000; i++)  // a little work
-        ;
-      pause(1);                                 // wait for "I/O"
+  if (b == 0) {
+    int n = 0;
+    while (uptime() < end && n < LECTURE_MAXROUNDS) {
+      burn(LECTURE_RUN);
+      int asleep = uptime();
+      pause(LECTURE_WAIT);
+      rounds[n].late = uptime() - (asleep + LECTURE_WAIT);
+      struct pstat_entry *pa = lookup(t, a);
+      rounds[n].alevel = pa ? pa->level : -1;
+      rounds[n].blevel = lookup(t, getpid())->level;
+      n++;
     }
-    int msg[2] = {uptime() - t0, lookup(t, getpid())->level};
-    write(fds[1], msg, sizeof(msg));
+    write(fds[1], &n, sizeof(n));
+    write(fds[1], rounds, n * sizeof(rounds[0]));
     exit(0);
   }
   close(fds[1]);
-  int msg[2];
-  if (read(fds[0], msg, sizeof(msg)) != sizeof(msg))
-    fail(t, "no report from the interactive job");
-  wait(0);  // the interactive job
-  struct pstat_entry *c = lookup(t, cpu);
-  uint cpu_gained = c ? total_ticks(c) - cpu_before : 0;
-  int cpu_level = c ? c->level : -1;
-  kill(cpu);
+  int n = 0;
+  if (read(fds[0], &n, sizeof(n)) != sizeof(n) || n <= 0)
+    fail(t, "no report from job B");
+  char *p = (char *)rounds;
+  int want = n * sizeof(rounds[0]);
+  for (int got = 0, k; got < want; got += k)
+    if ((k = read(fds[0], p + got, want - got)) <= 0)
+      fail(t, "short report from job B");
+  close(fds[0]);
+  wait(0);  // job B
+  int b_ticks = uptime() - b_start;
+  e = lookup(t, a);
+  uint a_top_after = e ? e->ticks[0] : 0;
+  uint a_gained = e ? total_ticks(e) - a_total_before : 0;
+  kill(a);
   wait(0);
 
-  printf("mlfqtest: %s: interactive job took %d ticks for %d rounds "
-         "at level %d; CPU-bound job got %d ticks at level %d\n",
-         t, msg[0], LECTURE_ROUNDS, msg[1], cpu_gained, cpu_level);
-  if (msg[1] != 0)
-    fail(t, "interactive job left the top level");
-  if (msg[0] > LECTURE_ROUNDS + 5)
-    fail(t, "interactive job was kept waiting for the CPU");
-  if (cpu_level != low)
-    fail(t, "CPU-bound job is not at the lowest level");
-  if (cpu_gained < LECTURE_ROUNDS / 2)
-    fail(t, "CPU-bound job did not get most of the CPU");
+  int above = 0, slow = 0, lowest = 0, back = 0;
+  printf("mlfqtest: %s: B/A levels each round:", t);
+  for (int i = 0; i < n; i++) {
+    struct lecture_round *r = &rounds[i];
+    printf(" %d/%d", r->blevel, r->alevel);
+    if (r->blevel < r->alevel) {
+      above++;
+      if (r->late > 1)
+        slow++;
+    }
+    if (r->blevel > lowest)
+      lowest = r->blevel;
+    if (lowest > 0 && r->blevel == 0)
+      back = 1;
+  }
+  printf("\nmlfqtest: %s: A at level %d when B arrived; B woke above A "
+         "in %d of %d rounds; A got %d of %d ticks\n",
+         t, a_level, above, n, a_gained, b_ticks);
+
+  if (a_level != low)
+    fail(t, "job A had not reached the lowest level when B arrived");
+  if (slow)
+    fail(t, "job B woke above A but waited more than 1 tick for the CPU");
+#if MLFQ_ACCOUNT_ACROSS_YIELDS
+  if (lowest == 0)
+    fail(t, "job B was never demoted, so its usage was not accumulated");
+#else
+  if (lowest != 0)
+    fail(t, "job B was demoted under the naive rule");
+  (void)back;  // B never leaves level 0, so it never comes back
+#endif
+  if (above < n / 2)
+    fail(t, "job B was not above A for most of the trace");
+#if MLFQ_ACCOUNT_ACROSS_YIELDS
+  if (!back)
+    fail(t, "the boost did not return job B to the top level");
+#endif
+  if (a_top_after <= a_top_before)
+    fail(t, "the boost did not return job A to the top level");
+  if (a_gained < (uint)b_ticks / 2)
+    fail(t, "job A did not keep getting most of the CPU");
   printf("mlfqtest: %s OK\n", t);
+#endif
 }
 
 static void

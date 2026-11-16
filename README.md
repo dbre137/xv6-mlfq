@@ -73,7 +73,7 @@ tests (`mlfqtest`) or only some (`mlfqtest demote boost`). It prints
 | `starve` | a CPU-bound process still gets CPU time with the boost (and starves without it, under the naive accounting rule) |
 | `gaming` | a process that runs ~70% of each tick and then sleeps is demoted (and is not, under the naive rule) |
 | `killexit` | processes that exit or are killed mid-quantum are cleaned up, and the next process starts clean |
-| `lecture` | Lecture 8's scenario: an interactive job stays at level 0 and responsive next to a CPU-bound job |
+| `lecture` | the trace on Lecture 8 slides 12-13: CPU-bound job A from time 0, interactive job B from time 6 (runs 1 tick, waits 4); B stays above A most of the time and drifts down, the boost brings both back to the top, A keeps most of the CPU |
 | `fork` | a forked child starts at level 0, not at its parent's level |
 
 ## Demonstration
